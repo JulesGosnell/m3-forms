@@ -41,6 +41,14 @@
 
 (def m3 (make-m3 {:draft "latest"}))
 
+(def products
+  (array-map
+   "Final Terms" {:m2 final-terms-m2 :m1 final-terms-m1 :m0 final-terms-m0
+                  :workflow final-terms-workflow-m1}
+   "Divorce" {:m2 divorce-m2 :m1 divorce-m1 :m0 ""
+              :workflow divorce-workflow-m1}
+   "Demo" {:m2 demo-m2 :m1 demo-m1 :m0 ""}))
+
 (rf/reg-event-db
  :initialise
  (fn-traced [_ [_ db]]
@@ -125,12 +133,41 @@
 
 ;;------------------------------------------------------------------------------
 
+(rf/reg-event-db
+ :select-product
+ (fn-traced [db [_ product-id]]
+            (let [{:keys [m2 m1 m0 workflow]} (get (:products db) product-id)
+                  first-state (get-in workflow ["states" 0 "$id"])]
+              (assoc db
+                     :product-id product-id
+                     :m2 m2 :m1 m1 :m0 (or m0 "")
+                     :workflow workflow
+                     :state-id first-state
+                     :active-tab 0))))
+
+(rf/reg-event-db
+ :transition
+ (fn-traced [db [_ state-id]]
+            (assoc db :state-id state-id :active-tab 0)))
+
+(rf/reg-event-db
+ :set-active-tab
+ (fn-traced [db [_ i]]
+            (assoc db :active-tab i)))
+
+;;------------------------------------------------------------------------------
+
 (rf/reg-sub :m3 (fn [db _] (:m3 db)))
 (rf/reg-sub :m2 (fn [db _] (:m2 db)))
 (rf/reg-sub :m1 (fn [db _] (:m1 db)))
 (rf/reg-sub :m0 (fn [db _] (:m0 db)))
 (rf/reg-sub :expanded (fn [db _] (:expanded db)))
 (rf/reg-sub :original-key (fn [db _] (:original-key db)))
+(rf/reg-sub :products (fn [db _] (:products db)))
+(rf/reg-sub :product-id (fn [db _] (:product-id db)))
+(rf/reg-sub :workflow (fn [db _] (:workflow db)))
+(rf/reg-sub :state-id (fn [db _] (:state-id db)))
+(rf/reg-sub :active-tab (fn [db _] (or (:active-tab db) 0)))
 
 (defn pretty [json]
   (let [sb (goog.string/StringBuffer.)]
@@ -216,35 +253,60 @@
         m1s (rf/subscribe [:m1])
         m0s (rf/subscribe [:m0])
         expanded (rf/subscribe [:expanded])
-        original-key (rf/subscribe [:original-key])]
+        original-key (rf/subscribe [:original-key])
+        products-sub (rf/subscribe [:products])
+        product-id-sub (rf/subscribe [:product-id])
+        workflow-sub (rf/subscribe [:workflow])
+        state-id-sub (rf/subscribe [:state-id])
+        active-tab-sub (rf/subscribe [:active-tab])]
     [:div
-     [:main
-      [:table {:align "center"}
-       [:tbody
-        [:tr
-         [:td
-          [:table
-           [:caption]
-           [:thead
-            [:tr
-             [:th "M3 Editor"]
-             [:th "M3 JSON"]
-             [:th "M2 Editor"]
-             [:th "M2 JSON"]
-             [:th "M1 Editor"]
-             [:th "M1 JSON"]
-             [:th "M0 Template"]
-             [:th "M0 Document"]]]
-           [:tbody
-            [:tr
-             [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s) {:draft "latest" :root @m3s :$ref-merger :merge-over} [:m3] nil @m3s)]]]]]
-             [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only true :value (pretty @m3s)}]]
-             [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s) {:draft "latest" :root @m2s :$ref-merger :merge-over} [:m2] nil @m2s)]]]]]
-             [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value (clj->json @m2s) :on-change (fn [event] (rf/dispatch [:assoc-in [:m2] (json->clj (.-value (.-target event)))]))}]]
-             [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m2s :$ref-merger :merge-over :check-format check-formats :expanded @expanded} [:m2] nil @m2s) {:draft "latest" :root @m1s :$ref-merger :merge-over} [:m1] nil @m1s)]]]]]
-             [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value (clj->json @m1s) :on-change (fn [event] (rf/dispatch [:assoc-in [:m1] (json->clj (.-value (.-target event)))]))}]]
-             [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value @m0s :on-change (fn [event] (rf/dispatch [:assoc-in [:m0] (.-value (.-target event))]))}]]
-             [:td {:valign :top} [html-string  (let [m1 @m1s m0 @m0s] (when (and m1 m0) (.parse marked ((.compile handlebars m0) (clj->js m1)))))]]]]]]]]]]]))
+     ;; App bar
+     [:header [my-app-bar]]
+     ;; Product selector
+     [:div {:style {:padding "8px" :text-align "center" :background "#f5f5f5"}}
+      [:label {:style {:margin-right "8px" :font-weight "bold"}} "Product: "]
+      [:select {:value (or @product-id-sub "")
+                :style {:font-size "16px" :padding "4px"}
+                :on-change (fn [e] (rf/dispatch [:select-product (.-value (.-target e))]))}
+       (doall
+        (map (fn [id] [:option {:key id :value id} id])
+             (keys @products-sub)))]]
+     ;; MUI customer pane
+     (when @workflow-sub
+       [:div {:style {:padding "16px" :background "#fafafa" :border-bottom "2px solid #ddd"}}
+        [view-forms {:m2 @m2s :m1 @m1s :workflow @workflow-sub
+                     :state-id @state-id-sub :active-tab @active-tab-sub
+                     :expanded (or @expanded #{})}]])
+     ;; Developer pane
+     [:details {:open true}
+      [:summary {:style {:padding "8px" :cursor "pointer" :background "#e0e0e0" :font-weight "bold"}} "Developer View"]
+      [:main
+       [:table {:align "center"}
+        [:tbody
+         [:tr
+          [:td
+           [:table
+            [:caption]
+            [:thead
+             [:tr
+              [:th "M3 Editor"]
+              [:th "M3 JSON"]
+              [:th "M2 Editor"]
+              [:th "M2 JSON"]
+              [:th "M1 Editor"]
+              [:th "M1 JSON"]
+              [:th "M0 Template"]
+              [:th "M0 Document"]]]
+            [:tbody
+             [:tr
+              [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s) {:draft "latest" :root @m3s :$ref-merger :merge-over} [:m3] nil @m3s)]]]]]
+              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only true :value (pretty @m3s)}]]
+              [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s) {:draft "latest" :root @m2s :$ref-merger :merge-over} [:m2] nil @m2s)]]]]]
+              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value (clj->json @m2s) :on-change (fn [event] (rf/dispatch [:assoc-in [:m2] (json->clj (.-value (.-target event)))]))}]]
+              [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m2s :$ref-merger :merge-over :check-format check-formats :expanded @expanded} [:m2] nil @m2s) {:draft "latest" :root @m1s :$ref-merger :merge-over} [:m1] nil @m1s)]]]]]
+              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value (clj->json @m1s) :on-change (fn [event] (rf/dispatch [:assoc-in [:m1] (json->clj (.-value (.-target event)))]))}]]
+              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value @m0s :on-change (fn [event] (rf/dispatch [:assoc-in [:m0] (.-value (.-target event))]))}]]
+              [:td {:valign :top} [html-string (let [m1 @m1s m0 @m0s] (when (and m1 m0) (.parse marked ((.compile handlebars m0) (clj->js m1)))))]]]]]]]]]]]]))
 
 ;; -------------------------
 ;; Initialize app
@@ -254,8 +316,18 @@
     (d/render [home-page] container)))
 
 (defn ^:export init! []
-  (rf/dispatch [:initialise {:m3 m3 :m2s (index-by-$id [final-terms-m2 workflow-m2]) :m2-id "Model" :m2 final-terms-m2 :m1s  (index-by-$id final-terms-m1 workflow-m1) :m1-id "model" :m1 final-terms-m1 :m0 final-terms-m0 :expanded #{}}])
-  (mount-root))
+  (let [default-id "Final Terms"
+        {:keys [m2 m1 m0 workflow]} (products default-id)]
+    (rf/dispatch [:initialise
+                  {:m3 m3
+                   :products products
+                   :product-id default-id
+                   :m2 m2 :m1 m1 :m0 (or m0 "")
+                   :workflow workflow
+                   :state-id (get-in workflow ["states" 0 "$id"])
+                   :active-tab 0
+                   :expanded #{}}])
+    (mount-root)))
 
 ;; shadow-cljs auto-reload api
 (defn ^:dev/after-load re-render []

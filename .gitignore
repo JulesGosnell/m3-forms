@@ -3,3 +3,7 @@ node_modules/
 target/
 .nrepl-port
 resources/public/js/
+.mcp.json
+.mcp.json~
+.cpcache/
+.clj-kondo/

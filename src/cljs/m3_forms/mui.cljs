@@ -65,7 +65,7 @@
    [m3-forms.json :refer [absent present?]]
    [m3-forms.schema :as json]
    [m3-forms.util :refer [valid? check-formats conjv make-id mapl vector-remove-nth]]
-   [m3-forms.render :refer [render-2 render-1]]
+   [m3-forms.render :refer [render-2 render-1 get-m1]]
 
    [m3-forms.divorce :refer [security-model]] ;TODO: should not be here
    ))
@@ -151,9 +151,9 @@
           [role-menu :role-button (:roles @state)]
           [role-button :role-button]]]]]))
 
-  (defn tab-panel [{i :index} child]
+  (defn tab-panel [{i :index at :active-tab} child]
     (let [id (str "simple-tabpanel-" i)
-          active? (= i (:active-tab @state))]
+          active? (= i at)]
       [:div
        {:role "tabpanel"
         :hidden (not active?)
@@ -165,52 +165,88 @@
           [typography {:component :div} child]])]))
 
   (defn transition-buttons [bs]
-    [box {:sx {:display :flex :justify-content :center}}
-     [button-group
-      {:variant :contained}
-      (doall
-       (map-indexed
-        (fn [i {b "title" s "state"}]
-          [button {:key i :on-change (fn [_e] (println "BUTTON:" s))}
-           b])
-        bs))]])
+    (when (seq bs)
+      [box {:sx {:display :flex :justify-content :center}}
+       [button-group
+        {:variant :contained}
+        (doall
+         (map-indexed
+          (fn [i {b "title" s "state"}]
+            [button {:key i :on-click (fn [_e] (rf/dispatch [:transition s]))}
+             b])
+          bs))]]))
 
   (def item identity)
 
-  (defn view-forms [[{{{m2-vs "prefixItems"} "views"} "properties"} {m1-vs "views" ts "transitions"}]]
-    [grid {:container true :spacing 4 :justify-content :center}
-     [grid {:item true :xs 12}
-      [item
-       [stepper {:active-step 1 :alternative-label true}
-        [step  [step-label "Personal Information"]]
-        [step  [step-label "Assets & Liabilities"]]
-        [step  [step-label "Personal Expenses"]]
-        [step [step-label "Making an Offer"]]]]]
-     [grid {:item true :xs 12 :justify-content :center}
-      [item
-       [transition-buttons ts]]]
-     [grid {:item true :xs 12}
-      [item
-       [box {:sx {:width "100%"}}
-        [box {:sx {:border-bottom 1 :border-color "divider"}}
-         [tabs {:variant :fullWidth
-                :value (:active-tab @state) :on-change (fn [e i] (swap! state assoc :active-tab i))}
-          (doall
-           (map
-            (fn [i {t "title"}]
-              [tab {:key i :id (str "simple-tab-" i) :aria-controls (str "simple-tabpanel-" i) :label t :value i :wrapped true}])
-            (range)
-            m2-vs))]]
-        (doall
-         (map
-          (fn [i v m1]
-            [tab-panel {:key i :index i} [:table [:tbody [:tr [:td ((render-1 {:ui ::mui :check-format check-formats :draft "latest" :$ref-merger :merge-over :expanded #{}} [:m2] nil v) {} [:m1] nil m1)]]]]])
-          (range)
-          m2-vs
-          m1-vs))]]]
-     [grid  {:item true :xs 12 :justify-content :center}
-      [item
-       [transition-buttons ts]]]]))
+  (defn view-forms [{:keys [m2 m1 workflow state-id active-tab expanded]}]
+    (let [states (get workflow "states")
+          state-index (or (some (fn [[i s]] (when (= (get s "$id") state-id) i))
+                                (map-indexed vector states))
+                          0)
+          current-state (get states state-index)
+          views (get current-state "views")
+          transitions (get current-state "transitions")
+          m2-props (get m2 "properties")
+          ;; "everything" means render the whole object
+          everything? (and (= 1 (count views)) (= ["everything"] (first views)))]
+      [grid {:container true :spacing 2 :justify-content :center}
+       ;; Stepper (only if >1 state)
+       (when (> (count states) 1)
+         [grid {:item true :xs 12}
+          [item
+           [stepper {:active-step state-index :alternative-label true}
+            (doall
+             (map (fn [{id "$id"}]
+                    (let [label (or (some->> (get (some #(when (= (get % "$id") id) %) states) "views")
+                                             first first
+                                             (get m2-props)
+                                             (#(get % "title")))
+                                    id)]
+                      [step {:key id} [step-label label]]))
+                  states))]]])
+       ;; Top transition buttons
+       [grid {:item true :xs 12 :justify-content :center}
+        [item [transition-buttons transitions]]]
+       ;; Views
+       [grid {:item true :xs 12}
+        [item
+         (if everything?
+           ;; Single "everything" view — render the whole object
+           [:div
+            ((render-1 {:ui ::mui :root m2 :check-format check-formats
+                        :draft "latest" :$ref-merger :merge-over
+                        :expanded expanded}
+              [:m2] nil m2)
+             {:root m1} [:m1] nil m1)]
+           ;; Multiple views — render as tabs
+           [box {:sx {:width "100%"}}
+            [box {:sx {:border-bottom 1 :border-color "divider"}}
+             [tabs {:variant :fullWidth
+                    :value (min active-tab (max 0 (dec (count views))))
+                    :on-change (fn [_e i] (rf/dispatch [:set-active-tab i]))}
+              (doall
+               (map-indexed
+                (fn [i view-path]
+                  (let [prop-name (first view-path)
+                        title (or (get-in m2-props [prop-name "title"]) prop-name)]
+                    [tab {:key i :label title :value i}]))
+                views))]]
+            (doall
+             (map-indexed
+              (fn [i view-path]
+                (let [prop-name (first view-path)
+                      view-m2 (get m2-props prop-name)
+                      view-m1 (get m1 prop-name)]
+                  [tab-panel {:key i :index i :active-tab active-tab}
+                   ((render-1 {:ui ::mui :root m2 :check-format check-formats
+                               :draft "latest" :$ref-merger :merge-over
+                               :expanded expanded}
+                     [:m2 "properties" prop-name] nil view-m2)
+                    {:root m1} [:m1 prop-name] nil view-m1)]))
+              views))])]]
+       ;; Bottom transition buttons
+       [grid {:item true :xs 12 :justify-content :center}
+        [item [transition-buttons transitions]]]])))
 
 ;;------------------------------------------------------------------------------
 
@@ -281,13 +317,108 @@
    {title "title" des "description" es "enum" d "default" c "const" minL "minLength" maxL "maxLength" ro "readOnly" :as m2}]
   (let [v? (valid? c2 m2)]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:background "#ffff99" :padding "8px"} :class (v? c1 m1)}
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
        (if (seq es)
-         nil ;; TODO: enum string drop-down
+         [text-field {:select true :label title :value (or (when (present? m1) m1) "")
+                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}
+          (doall (map (fn [v] [menu-item {:key v :value v} v]) es))]
          [text-field
-          {:placeholder d
-           :default-value (when (present? m1) m1)
-           :label title}])])))
+          {:label title :placeholder d :read-only (boolean (or c ro))
+           :value (or c (when (present? m1) m1) "")
+           :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}])])))
+
+(defmethod render-2 [::mui "string" "date"]
+  [c2 p2 k2 {title "title" :as m2}]
+  (let [v? (valid? c2 m2)]
+    (fn [c1 p1 k1 m1]
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
+       [text-field {:type "date" :label title
+                    :value (or (when (present? m1) m1) "")
+                    :InputLabelProps {:shrink true}
+                    :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}]])))
+
+(defmethod render-2 [::mui "string" "date-time"]
+  [c2 p2 k2 {title "title" :as m2}]
+  (let [v? (valid? c2 m2)]
+    (fn [c1 p1 k1 m1]
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
+       [text-field {:type "datetime-local" :label title
+                    :value (or (when (present? m1) m1) "")
+                    :InputLabelProps {:shrink true}
+                    :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}]])))
+
+(defmethod render-2 [::mui "integer" :default]
+  [c2 p2 k2 {title "title" d "default" c "const" min "minimum" max "maximum" es "enum" :as m2}]
+  (let [v? (valid? c2 m2)]
+    (fn [c1 p1 k1 m1]
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
+       (if (seq es)
+         [text-field {:select true :label title :value (or (when (present? m1) m1) "")
+                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (js/parseInt (.-value (.-target e)) 10)]))}
+          (doall (map (fn [v] [menu-item {:key v :value v} (str v)]) es))]
+         [text-field {:type "number" :label title
+                      :value (or c (when (present? m1) m1) "")
+                      :input-props {:min min :max max}
+                      :on-change (fn [e] (let [v (.-value (.-target e))]
+                                           (if (empty? v)
+                                             (rf/dispatch [:delete-in p1])
+                                             (rf/dispatch [:assoc-in p1 (js/parseInt v 10)]))))}])])))
+
+(defmethod render-2 [::mui "number" :default]
+  [c2 p2 k2 {title "title" d "default" c "const" min "minimum" max "maximum" es "enum" :as m2}]
+  (let [v? (valid? c2 m2)]
+    (fn [c1 p1 k1 m1]
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
+       (if (seq es)
+         [text-field {:select true :label title :value (or (when (present? m1) m1) "")
+                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (js/parseFloat (.-value (.-target e)))]))}
+          (doall (map (fn [v] [menu-item {:key v :value v} (str v)]) es))]
+         [text-field {:type "number" :label title
+                      :value (or c (when (present? m1) m1) "")
+                      :on-change (fn [e] (let [v (.-value (.-target e))]
+                                           (if (empty? v)
+                                             (rf/dispatch [:delete-in p1])
+                                             (rf/dispatch [:assoc-in p1 (js/parseFloat v)]))))}])])))
+
+(defmethod render-2 [::mui "boolean" :default]
+  [c2 p2 k2 {title "title" c "const" :as m2}]
+  (let [v? (valid? c2 m2)]
+    (fn [c1 p1 k1 m1]
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
+       [form-control
+        [checkbox {:checked (boolean (and (present? m1) m1))
+                   :read-only (boolean c)
+                   :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-checked (.-target e))]))}]
+        [input-label title]]])))
+
+(defmethod render-2 [::mui "oneOf" :default]
+  [c2 p2 k2 {oos "oneOf" t "title" des "description" :as m2}]
+  (let [v? (valid? c2 m2)]
+    (fn [c1 p1 k1 m1]
+      (let [{valid true invalid false}
+            (if (present? m1)
+              (group-by
+               (comp not seq second)
+               (mapv (fn [oo] [oo ((json/check-schema c2 p1 oo) c1 [] m1)]) oos))
+              {})
+            num-valid (count valid)
+            match (ffirst valid)
+            labels (mapv (fn [oo] (let [oo (json/expand-$ref c2 p2 oo)]
+                                    (or (oo "title") (get-in oo ["properties" "type" "const"]) "?")))
+                         oos)]
+        [:div {:style {:padding "8px"} :class (v? c1 m1)}
+         [paper {:sx {:p 2} :variant :outlined}
+          (when t [typography {:variant :h6 :gutterBottom true} t])
+          [text-field {:select true :label (or t "Select type") :full-width true
+                       :value (or (some (fn [[i oo]] (when (= oo match) i)) (map-indexed vector oos)) "")
+                       :on-change (fn [e] (let [idx (js/parseInt (.-value (.-target e)) 10)
+                                                oo (nth oos idx)
+                                                new-m1 (get-m1 c2 p2 oo)]
+                                            (rf/dispatch [:assoc-in p1 new-m1])))}
+           (doall (map-indexed (fn [i label] [menu-item {:key i :value i} label]) labels))]
+          (when match
+            [:div {:style {:padding-top "8px"}}
+             ((render-1 c2 p2 k2 match) c1 p1 k1 m1)])]]))))
 
 (defmethod render-2 [::mui "object" :default]
   [{expanded? :expanded ok :original-key :as c2}
@@ -295,18 +426,18 @@
    {ps "properties" pps "patternProperties" aps "additionalProperties" title "title" es "enum" :as m2}]
   (let [v? (valid? c2 m2)]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:background "#99ccff" :padding "8px"} :class (v? c1 m1)}
-       [stack {:spacing 2 :label "TITLE" :variant :outlined}
-        (doall
-         (map
-          (fn [[k {t "title" d "description" :as m2}]]
-            (let [p2 (vec (concat p2 ["properties" k]))
-                  p1 (conjv p1 k)
-                  id (make-id p1)
-                  squidgable? false
-                  visible? (or (and squidgable? (expanded? p2)) (not squidgable?))]
-              [:div {:key id} ((render-1 c2 p2 k m2) c1 p1 k (get (when (present? m1) m1) k absent))]))
-          ps))]])))
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
+       [paper {:sx {:p 2} :variant :outlined}
+        (when title [typography {:variant :h6 :gutterBottom true} title])
+        [stack {:spacing 2}
+         (doall
+          (map
+           (fn [[k {t "title" d "description" :as m2}]]
+             (let [p2 (vec (concat p2 ["properties" k]))
+                   p1 (conjv p1 k)
+                   id (make-id p1)]
+               [:div {:key id} ((render-1 c2 p2 k m2) c1 p1 k (get (when (present? m1) m1) k absent))]))
+           ps))]]])))
 
 (defmethod render-2 [::mui "array" :default]
   [c2 p2 k2
