@@ -19,7 +19,7 @@
    ["handlebars$default" :as handlebars]
    ["marked" :refer [marked]]
    [reagent.core :as reagent]
-   [reagent.dom :as d]
+   [reagent.dom.client :as rdc]
    [re-frame.core :as rf]
    [day8.re-frame.tracing :refer-macros [fn-traced]]
    [m3-forms.log :as log]
@@ -315,9 +315,10 @@
 ;; -------------------------
 ;; Initialize app
 
+(defonce root (rdc/create-root (.getElementById js/document "app")))
+
 (defn mount-root []
-  (let [container (.getElementById js/document "app")]
-    (d/render [home-page] container)))
+  (rdc/render root [home-page]))
 
 (defn ^:export init! []
   (let [default-id "Final Terms"
@@ -335,4 +336,4 @@
 
 ;; shadow-cljs auto-reload api
 (defn ^:dev/after-load re-render []
-  (init!))
+  (mount-root))
