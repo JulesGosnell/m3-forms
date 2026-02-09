@@ -76,11 +76,32 @@ The dev server at http://localhost:8280 hot-reloads on save.
 
 ## Known Issues / Areas for Improvement
 
-- MUI customer pane renders but styling needs work — MUI components may look plain without proper theming
-- The `squidgy?` expand/collapse mechanism works but only for objects and oneOf — arrays and deeply nested types could benefit from it
-- M3 editor is self-referential (renders the meta-schema using itself) — collapse guards prevent infinite recursion
-- M0 document generation (Handlebars + Marked) only works for Final Terms currently
-- Drag-and-drop reordering (zip dispatches) was removed during migration — could be re-enabled
-- The `::mui "array"` renderer has add/delete buttons but no drag reordering
-- `schema.cljc` has a stub `check-schema` — doesn't use the real m3 validator yet
-- No tests yet
+### High Priority
+- **React 18 migration** — `ReactDOM.render` is deprecated; need `reagent.dom.client/create-root`. Only remaining console error.
+- **No tests** — Need schema validation tests, render pipeline tests, workflow state tests.
+
+### Medium Priority
+- **"oneOf: 2 schemas matched" warning** — M3 meta-schema Untyped/Object variants overlap. Fix: add discriminator constraints.
+- **Developer pane quality** — 8-column table layout is crude, needs proper styling and collapsible sections.
+- **`check-schema` is a stub** — Doesn't use the real M3 validator. Validation is incomplete.
+- **Form validation UX** — No required field indicators, no inline error messages, no validation summary.
+
+### Lower Priority
+- **Drag-and-drop reordering** — Removed during migration. Array items can be added/deleted but not reordered.
+- **M0 document generation** — Only works for Final Terms. Divorce and Demo have no M0 templates.
+- **squidgy expand/collapse** — Only for objects and oneOf; arrays and deep types could benefit.
+- **MUI theming** — No custom theme. Components use default MUI styling.
+
+## Vision & Roadmap
+
+The goal is a **multi-platform schema-driven form engine**:
+- **Web** — MUI customer pane (current, working)
+- **Mobile** — Capacitor/WebView wrapping the web pane, or React Native renderers
+- **Developer** — HTML5 pane for schema iteration (needs polish)
+
+The multimethod dispatch on `[ui-mode type format]` makes adding new rendering backends straightforward: `(derive ::new-backend ::html5)` + implement methods.
+
+Future: multi-party workflows, broader applicability (legal, finance, HR, blockchain).
+
+### Critical Architecture Note: Memoization Trap
+`render = (memoize render-2)`. If a renderer calls `render-1` with arguments matching its own dispatch key, it recurses infinitely because the memoized first call hasn't returned yet. Always ensure inner `render-1` calls use shadowed/different arguments (e.g., item-level schema, not the parent array schema).
