@@ -15,6 +15,7 @@
 (ns m3-forms.mui
   (:require
    [clojure.set :refer [rename-keys]]
+   [clojure.string :as str]
    [react :as react]
    [reagent.core :as r]
    [re-frame.core :as rf]
@@ -69,6 +70,16 @@
 
    [m3-forms.divorce :refer [security-model]] ;TODO: should not be here
    ))
+
+(defn key->label
+  "Convert a camelCase or snake_case property key to a readable label.
+   e.g. \"fullName\" -> \"Full Name\", \"email_address\" -> \"Email Address\""
+  [k]
+  (when (string? k)
+    (-> k
+        (str/replace #"([a-z])([A-Z])" "$1 $2")
+        (str/replace #"[_-]" " ")
+        (str/replace #"\b\w" str/upper-case))))
 
 (let [state (r/atom {:roles (security-model "roles") :active-roles #{} :active-tab 0})]
 
@@ -260,10 +271,11 @@
 
 (defn render-money-2 [c2 p2 k2 {t "type" title "title" des "description" es "enum" d "default" c "const" min "minimum" max "maximum" mo "multipleOf" :as m2}]
   (let [v? (valid? c2 m2)
+        label (or title (key->label k2))
         scale (if (= t "number") 2 0)
         signed (or (not min) (< min 0))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:background "#ffff99" :padding "8px"} :class (v? c1 m1)}
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
        [masked-text-field
         {:mask "£num"
          :blocks {"num"
@@ -278,7 +290,8 @@
                    :max max}}
          :value (str m1)
          :unmask true
-         :label title}]])))
+         :label label
+         :full-width true}]])))
 
 (def render-money (memoize render-money-2))
 
@@ -289,9 +302,10 @@
   (render-money c2 p2 k2 m2))
 
 (defn render-imaskjs-2 [c2 p2 k2 {title "title" des "description" es "enum" d "default" c "const" :as m2} mask unmask]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:background "#ffff99" :padding "8px"} :class (v? c1 m1)}
+      [:div {:style {:padding "8px"} :class (v? c1 m1)}
        [masked-text-field
         {:mask mask
          :value m1
@@ -299,7 +313,8 @@
          :placeholder-char \_
          :lazy false
          :overwrite true
-         :label title}]])))
+         :label label
+         :full-width true}]])))
 
 (def render-imaskjs (memoize render-imaskjs-2))
 
@@ -315,85 +330,107 @@
 (defmethod render-2 [::mui "string" :default]
   [c2 p2 k2
    {title "title" des "description" es "enum" d "default" c "const" minL "minLength" maxL "maxLength" ro "readOnly" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:padding "8px"} :class (v? c1 m1)}
-       (if (seq es)
-         [text-field {:select true :label title :value (or (when (present? m1) m1) "")
-                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}
-          (doall (map (fn [v] [menu-item {:key v :value v} v]) es))]
-         [text-field
-          {:label title :placeholder d :read-only (boolean (or c ro))
-           :value (or c (when (present? m1) m1) "")
-           :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}])])))
+      (let [validity (v? c1 m1)
+            err? (= validity "invalid")]
+        [:div {:style {:padding "8px"} :class validity}
+         (if (seq es)
+           [text-field {:select true :label label :error err? :full-width true
+                        :value (or (when (present? m1) m1) "")
+                        :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}
+            (doall (map (fn [v] [menu-item {:key v :value v} v]) es))]
+           [text-field
+            {:label label :placeholder d :read-only (boolean (or c ro)) :error err? :full-width true
+             :value (or c (when (present? m1) m1) "")
+             :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}])]))))
 
 (defmethod render-2 [::mui "string" "date"]
   [c2 p2 k2 {title "title" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:padding "8px"} :class (v? c1 m1)}
-       [text-field {:type "date" :label title
-                    :value (or (when (present? m1) m1) "")
-                    :InputLabelProps {:shrink true}
-                    :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}]])))
+      (let [validity (v? c1 m1)
+            err? (= validity "invalid")]
+        [:div {:style {:padding "8px"} :class validity}
+         [text-field {:type "date" :label label :error err? :full-width true
+                      :value (or (when (present? m1) m1) "")
+                      :InputLabelProps {:shrink true}
+                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}]]))))
 
 (defmethod render-2 [::mui "string" "date-time"]
   [c2 p2 k2 {title "title" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:padding "8px"} :class (v? c1 m1)}
-       [text-field {:type "datetime-local" :label title
-                    :value (or (when (present? m1) m1) "")
-                    :InputLabelProps {:shrink true}
-                    :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}]])))
+      (let [validity (v? c1 m1)
+            err? (= validity "invalid")]
+        [:div {:style {:padding "8px"} :class validity}
+         [text-field {:type "datetime-local" :label label :error err? :full-width true
+                      :value (or (when (present? m1) m1) "")
+                      :InputLabelProps {:shrink true}
+                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-value (.-target e))]))}]]))))
 
 (defmethod render-2 [::mui "integer" :default]
   [c2 p2 k2 {title "title" d "default" c "const" min "minimum" max "maximum" es "enum" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:padding "8px"} :class (v? c1 m1)}
-       (if (seq es)
-         [text-field {:select true :label title :value (or (when (present? m1) m1) "")
-                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (js/parseInt (.-value (.-target e)) 10)]))}
-          (doall (map (fn [v] [menu-item {:key v :value v} (str v)]) es))]
-         [text-field {:type "number" :label title
-                      :value (or c (when (present? m1) m1) "")
-                      :input-props {:min min :max max}
-                      :on-change (fn [e] (let [v (.-value (.-target e))]
-                                           (if (empty? v)
-                                             (rf/dispatch [:delete-in p1])
-                                             (rf/dispatch [:assoc-in p1 (js/parseInt v 10)]))))}])])))
+      (let [validity (v? c1 m1)
+            err? (= validity "invalid")]
+        [:div {:style {:padding "8px"} :class validity}
+         (if (seq es)
+           [text-field {:select true :label label :error err? :full-width true
+                        :value (or (when (present? m1) m1) "")
+                        :on-change (fn [e] (rf/dispatch [:assoc-in p1 (js/parseInt (.-value (.-target e)) 10)]))}
+            (doall (map (fn [v] [menu-item {:key v :value v} (str v)]) es))]
+           [text-field {:type "number" :label label :error err? :full-width true
+                        :value (or c (when (present? m1) m1) "")
+                        :input-props {:min min :max max}
+                        :on-change (fn [e] (let [v (.-value (.-target e))]
+                                             (if (empty? v)
+                                               (rf/dispatch [:delete-in p1])
+                                               (rf/dispatch [:assoc-in p1 (js/parseInt v 10)]))))}])]))))
 
 (defmethod render-2 [::mui "number" :default]
   [c2 p2 k2 {title "title" d "default" c "const" min "minimum" max "maximum" es "enum" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:padding "8px"} :class (v? c1 m1)}
-       (if (seq es)
-         [text-field {:select true :label title :value (or (when (present? m1) m1) "")
-                      :on-change (fn [e] (rf/dispatch [:assoc-in p1 (js/parseFloat (.-value (.-target e)))]))}
-          (doall (map (fn [v] [menu-item {:key v :value v} (str v)]) es))]
-         [text-field {:type "number" :label title
-                      :value (or c (when (present? m1) m1) "")
-                      :on-change (fn [e] (let [v (.-value (.-target e))]
-                                           (if (empty? v)
-                                             (rf/dispatch [:delete-in p1])
-                                             (rf/dispatch [:assoc-in p1 (js/parseFloat v)]))))}])])))
+      (let [validity (v? c1 m1)
+            err? (= validity "invalid")]
+        [:div {:style {:padding "8px"} :class validity}
+         (if (seq es)
+           [text-field {:select true :label label :error err? :full-width true
+                        :value (or (when (present? m1) m1) "")
+                        :on-change (fn [e] (rf/dispatch [:assoc-in p1 (js/parseFloat (.-value (.-target e)))]))}
+            (doall (map (fn [v] [menu-item {:key v :value v} (str v)]) es))]
+           [text-field {:type "number" :label label :error err? :full-width true
+                        :value (or c (when (present? m1) m1) "")
+                        :on-change (fn [e] (let [v (.-value (.-target e))]
+                                             (if (empty? v)
+                                               (rf/dispatch [:delete-in p1])
+                                               (rf/dispatch [:assoc-in p1 (js/parseFloat v)]))))}])]))))
 
 (defmethod render-2 [::mui "boolean" :default]
   [c2 p2 k2 {title "title" c "const" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:padding "8px"} :class (v? c1 m1)}
-       [form-control
-        [checkbox {:checked (boolean (and (present? m1) m1))
-                   :read-only (boolean c)
-                   :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-checked (.-target e))]))}]
-        [input-label title]]])))
+      (let [validity (v? c1 m1)
+            err? (= validity "invalid")]
+        [:div {:style {:padding "8px"} :class validity}
+         [form-control {:error err?}
+          [checkbox {:checked (boolean (and (present? m1) m1))
+                     :read-only (boolean c)
+                     :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-checked (.-target e))]))}]
+          [input-label label]]]))))
 
 (defmethod render-2 [::mui "oneOf" :default]
   [c2 p2 k2 {oos "oneOf" t "title" des "description" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or t (key->label k2))]
     (fn [c1 p1 k1 m1]
       (let [{valid true invalid false}
             (if (present? m1)
@@ -408,8 +445,8 @@
                          oos)]
         [:div {:style {:padding "8px"} :class (v? c1 m1)}
          [paper {:sx {:p 2} :variant :outlined}
-          (when t [typography {:variant :h6 :gutterBottom true} t])
-          [text-field {:select true :label (or t "Select type") :full-width true
+          (when label [typography {:variant :h6 :gutterBottom true} label])
+          [text-field {:select true :label (or label "Select type") :full-width true
                        :value (or (some (fn [[i oo]] (when (= oo match) i)) (map-indexed vector oos)) "")
                        :on-change (fn [e] (let [idx (js/parseInt (.-value (.-target e)) 10)
                                                 oo (nth oos idx)
@@ -424,11 +461,12 @@
   [{expanded? :expanded ok :original-key :as c2}
    p2 k2
    {ps "properties" pps "patternProperties" aps "additionalProperties" title "title" es "enum" :as m2}]
-  (let [v? (valid? c2 m2)]
+  (let [v? (valid? c2 m2)
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
       [:div {:style {:padding "8px"} :class (v? c1 m1)}
        [paper {:sx {:p 2} :variant :outlined}
-        (when title [typography {:variant :h6 :gutterBottom true} title])
+        (when label [typography {:variant :h6 :gutterBottom true} label])
         [stack {:spacing 2}
          (doall
           (map
@@ -441,25 +479,26 @@
 
 (defmethod render-2 [::mui "array" :default]
   [c2 p2 k2
-   {{def "default" :as is} "items" pis "prefixItems" maxIs "maxItems" ro? "readOnly" :as m2}]
+   {title "title" {def "default" :as is} "items" pis "prefixItems" maxIs "maxItems" ro? "readOnly" :as m2}]
   (let [v? (valid? c2 m2)
-        r1 (render-1 c2 p2 k2 m2)]
+        label (or title (key->label k2))]
     (fn [c1 p1 k1 m1]
       (let [m1 (when (present? m1) m1)]
-        [:div {:style {:background "#ffcccc"} :class (v? c1 m1)}
+        [:div {:style {:padding "8px"} :class (v? c1 m1)}
          [stack
+          (when label [typography {:variant :subtitle1 :gutterBottom true} label])
           [table-container {:component Paper}
            [table {:sx {} :size :small}
             [table-body
              (mapl
               (fn [n [prefix? m2 m1]]
                 (let [p2 (vec (concat p2 (if prefix? ["prefixItems" n] ["items"])))
-                      k2 (last p2)
+                      k2 nil
                       p1 (conjv p1 n)
                       k1 n]
                   [table-row {:key (make-id p1)}
                    [table-cell
-                    (r1 c1 p1 k1 m1)]
+                    ((render-1 c2 p2 k2 m2) c1 p1 k1 m1)]
                    [table-cell {:align :left}
                     (when  (and (not prefix?) (not ro?))
                       [button

@@ -85,9 +85,12 @@
 (def render (memoize render-2))
 
 (defn render-1 [c2 p2 k2 m2]
-  (let [r (render c2 p2 k2 (json/expand-$ref c2 p2 m2))]
-    (fn [c1 p1 k1 m1]
-      (r c1 p1 k1 (json/expand-$ref c2 p1 m1)))))
+  (let [expanded (json/expand-$ref c2 p2 m2)]
+    (if (map? expanded)
+      (let [r (render c2 p2 k2 expanded)]
+        (fn [c1 p1 k1 m1]
+          (r c1 p1 k1 (json/expand-$ref c2 p1 m1))))
+      (fn [_c1 _p1 _k1 _m1] nil))))
 
 (defmethod render-2 :default [c2 p2 k2 m2]
   (let [rk (render-key c2 m2)]

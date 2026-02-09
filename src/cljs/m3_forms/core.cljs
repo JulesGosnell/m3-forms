@@ -240,6 +240,9 @@
 
 (.registerHelper handlebars "eq" eq-helper)
 
+;; Configure marked to suppress deprecation warnings
+(.use marked (clj->js {:mangle false :headerIds false}))
+
 ;;------------------------------------------------------------------------------
 
 (defn html-string [html]
@@ -273,7 +276,8 @@
              (keys @products-sub)))]]
      ;; MUI customer pane
      (when @workflow-sub
-       [:div {:style {:padding "16px" :background "#fafafa" :border-bottom "2px solid #ddd"}}
+       [:div {:style {:padding "16px" :background "#fafafa" :border-bottom "2px solid #ddd"
+                      :max-width "960px" :margin "0 auto"}}
         [view-forms {:m2 @m2s :m1 @m1s :workflow @workflow-sub
                      :state-id @state-id-sub :active-tab @active-tab-sub
                      :expanded (or @expanded #{})}]])
