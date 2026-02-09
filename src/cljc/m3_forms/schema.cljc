@@ -81,8 +81,8 @@
 (defn check-schema
   "Compile a schema into a validator function.
   Returns (fn [m1-ctx m1-path m1] -> errors-or-nil).
-  Implements basic validation: property const matching, top-level type check,
-  and additionalProperties:false — enough to discriminate oneOf branches."
+  Implements validation: top-level type check, property const + type matching,
+  required, and additionalProperties:false — enough to discriminate oneOf branches."
   [m2-ctx _m2-path m2-doc]
   (let [expanded (expand-$ref m2-ctx _m2-path m2-doc)]
     (fn [_m1-ctx _m1-path m1]
@@ -107,11 +107,35 @@
                  (when (map? m1)
                    (keep (fn [[k prop-schema]]
                            (when (map? prop-schema)
-                             (when-let [c (get prop-schema "const")]
-                               (let [v (get m1 k ::not-found)]
-                                 (when (and (not= v ::not-found) (not= v c))
-                                   {:error "const" :property k :expected c :actual v})))))
+                             (let [v (get m1 k ::not-found)]
+                               (when (not= v ::not-found)
+                                 (or
+                                  ;; const check
+                                  (when-let [c (get prop-schema "const")]
+                                    (when (not= v c)
+                                      {:error "const" :property k :expected c :actual v}))
+                                  ;; property-level type check
+                                  (when-let [pt (get prop-schema "type")]
+                                    (when (string? pt)
+                                      (let [ok? (case pt
+                                                  "object"  (map? v)
+                                                  "array"   (or (vector? v) (sequential? v))
+                                                  "string"  (string? v)
+                                                  "number"  (number? v)
+                                                  "integer" (integer? v)
+                                                  "boolean" (boolean? v)
+                                                  "null"    (nil? v)
+                                                  true)]
+                                        (when-not ok?
+                                          {:error "property-type" :property k :expected pt})))))))))
                          props)))
+               ;; required — fail if any required property is missing from m1
+               (when-let [req (get expanded "required")]
+                 (when (map? m1)
+                   (keep (fn [k]
+                           (when-not (contains? m1 k)
+                             {:error "required" :property k}))
+                         req)))
                ;; additionalProperties: false — data keys must be in schema properties
                (when (and (false? (get expanded "additionalProperties"))
                           (map? m1))
@@ -231,6 +255,7 @@
          "$ref" (->def "commonPropertiesM3")
          "properties"
          {"oneOf" {"type" "array" "items" {"$ref" (->def "schemaM3")}}}
+         "required" ["oneOf"]
          "additionalProperties" false}
 
         any-of-m3
@@ -239,6 +264,7 @@
          "$ref" (->def "commonPropertiesM3")
          "properties"
          {"anyOf" {"type" "array" "items" {"$ref" (->def "schemaM3")}}}
+         "required" ["anyOf"]
          "additionalProperties" false}
 
         all-of-m3
@@ -247,6 +273,7 @@
          "$ref" (->def "commonPropertiesM3")
          "properties"
          {"allOf" {"type" "array" "items" {"$ref" (->def "schemaM3")}}}
+         "required" ["allOf"]
          "additionalProperties" false}
 
         not-m3
@@ -255,6 +282,7 @@
          "$ref" (->def "commonPropertiesM3")
          "properties"
          {"not" {"$ref" (->def "schemaM3")}}
+         "required" ["not"]
          "additionalProperties" false}
 
         typed-properties-m3
@@ -272,12 +300,14 @@
         {"title" "Null" "type" "object"
          "$ref" (->def "commonPropertiesM3")
          "properties" (apply array-map (typed-properties-m3 "null"))
+         "required" ["type"]
          "additionalProperties" false}
 
         boolean-m3
         {"title" "Boolean" "type" "object"
          "$ref" (->def "commonPropertiesM3")
          "properties" (apply array-map (typed-properties-m3 "boolean"))
+         "required" ["type"]
          "additionalProperties" false}
 
         numeric-properties
@@ -299,12 +329,14 @@
         {"title" "Number" "type" "object"
          "$ref" (->def "commonPropertiesM3")
          "properties" (apply array-map (numeric-properties "number"))
+         "required" ["type"]
          "additionalProperties" false}
 
         integer-m3
         {"title" "Integer" "type" "object"
          "$ref" (->def "commonPropertiesM3")
          "properties" (apply array-map (numeric-properties "integer"))
+         "required" ["type"]
          "additionalProperties" false}
 
         string-m3
@@ -323,6 +355,7 @@
              ["contentMediaType" {"type" "string" "enum" ["application/json"]}
               "contentEncoding" {"type" "string" "enum" ["quoted-printable" "base16" "base32" "base64"]}
               "contentSchema" {"$ref" (->def "schemaM3")}])))
+         "required" ["type"]
          "additionalProperties" false}
 
         object-m3
@@ -360,6 +393,7 @@
               "dependentSchemas" {"type" "object" "additionalProperties" {"$ref" (->def "schemaM3")}}
               "propertyDependencies" {"type" "object" "additionalProperties" {"type" "object" "additionalProperties" {"$ref" (->def "schemaM3")}}}
               "unevaluatedProperties" false])))
+         "required" ["type"]
          "additionalProperties" false}
 
         array-m3
@@ -385,12 +419,14 @@
               "unevaluatedItems" {"oneOf" [{"$ref" (->def "booleanM2")} {"$ref" (->def "schemaM3")}]}
               "minContains" {"type" "integer" "minimum" 0}
               "maxContains" {"type" "integer" "minimum" 1}])))
+         "required" ["type"]
          "additionalProperties" false}
 
         type-array-m3
         {"title" "Type Array" "type" "object"
          "$ref" (->def "commonPropertiesM3")
          "properties" {"type" {"type" "array" "items" {"type" "string"}}}
+         "required" ["type"]
          "additionalProperties" false}
 
         boolean-m2

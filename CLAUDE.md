@@ -77,13 +77,10 @@ The dev server at http://localhost:8280 hot-reloads on save.
 ## Known Issues / Areas for Improvement
 
 ### High Priority
-- **React 18 migration** — `ReactDOM.render` is deprecated; need `reagent.dom.client/create-root`. Only remaining console error.
 - **No tests** — Need schema validation tests, render pipeline tests, workflow state tests.
 
 ### Medium Priority
-- **"oneOf: 2 schemas matched" warning** — M3 meta-schema Untyped/Object variants overlap. Fix: add discriminator constraints.
 - **Developer pane quality** — 8-column table layout is crude, needs proper styling and collapsible sections.
-- **`check-schema` is a stub** — Doesn't use the real M3 validator. Validation is incomplete.
 - **Form validation UX** — No required field indicators, no inline error messages, no validation summary.
 
 ### Lower Priority
