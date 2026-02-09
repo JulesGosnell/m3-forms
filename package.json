@@ -1,0 +1,23 @@
+{
+  "name": "m3-forms",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx shadow-cljs watch app",
+    "release": "npx shadow-cljs release app"
+  },
+  "devDependencies": {
+    "shadow-cljs": "^2.28.3"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.10.4",
+    "@emotion/styled": "^11.10.4",
+    "@js-joda/core": "^3.2.0",
+    "@mui/material": "^5.10.1",
+    "handlebars": "^4.7.7",
+    "marked": "^5.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-imask": "^6.4.3"
+  }
+}
