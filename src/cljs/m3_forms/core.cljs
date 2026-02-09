@@ -16,8 +16,7 @@
   (:require
    [cljs.pprint :as ppt]
    [cljs.core :as cljs]
-   ["handlebars$default" :as handlebars]
-   ["marked" :refer [marked]]
+   [clojure.string :as str]
    [reagent.core :as reagent]
    [reagent.dom.client :as rdc]
    [re-frame.core :as rf]
@@ -26,15 +25,17 @@
 
    [m3-forms.util     :refer [index-by-$id check-formats]]
    [m3-forms.schema   :refer [make-m3]]
-   [m3-forms.json     :refer [json-insert-in json-remove-in]]
+   [m3-forms.json     :refer [json-insert-in json-remove-in option-get-in insertv deletev]]
    [m3-forms.migrate  :refer [migrate]]
    [m3-forms.render   :refer [render-1]]
    [m3-forms.mui      :refer [my-app-bar view-forms]]
    [m3-forms.page     :refer [->page]]
+   [m3-forms.mdast    :refer [mdast-document]]
 
-   [m3-forms.demo     :refer [demo-m2 demo-m1]]
+   [m3-forms.demo     :refer [demo-workflow-m1 demo-m2 demo-m1]]
    [m3-forms.divorce  :refer [divorce-workflow-m1 divorce-m2 divorce-m1]]
-   [m3-forms.final-terms  :refer [final-terms-workflow-m1 final-terms-m2 final-terms-m1 final-terms-m0]]
+   [m3-forms.final-terms  :refer [final-terms-workflow-m1 final-terms-m2 final-terms-m1]]
+   [m3-forms.m0       :refer [document-view]]
    ))
 
 ;;------------------------------------------------------------------------------
@@ -43,11 +44,12 @@
 
 (def products
   (array-map
-   "Final Terms" {:m2 final-terms-m2 :m1 final-terms-m1 :m0 final-terms-m0
+   "Final Terms" {:m2 final-terms-m2 :m1 final-terms-m1
                   :workflow final-terms-workflow-m1}
-   "Divorce" {:m2 divorce-m2 :m1 divorce-m1 :m0 ""
+   "Divorce" {:m2 divorce-m2 :m1 divorce-m1
               :workflow divorce-workflow-m1}
-   "Demo" {:m2 demo-m2 :m1 demo-m1 :m0 ""}))
+   "Demo" {:m2 demo-m2 :m1 demo-m1
+            :workflow demo-workflow-m1}))
 
 (rf/reg-event-db
  :initialise
@@ -122,6 +124,17 @@
 ;;------------------------------------------------------------------------------
 
 (rf/reg-event-db
+ :array-reorder
+ (fn-traced [db [_ array-path from-idx to-idx]]
+            (let [arr (get-in db array-path)
+                  item (nth arr from-idx)
+                  removed (deletev arr from-idx)
+                  inserted (insertv removed (min to-idx (count removed)) item)]
+              (assoc-in db array-path inserted))))
+
+;;------------------------------------------------------------------------------
+
+(rf/reg-event-db
  :expand
  (fn-traced [db [_ path]]
             (update-in db [:expanded] conj path)))
@@ -136,11 +149,11 @@
 (rf/reg-event-db
  :select-product
  (fn-traced [db [_ product-id]]
-            (let [{:keys [m2 m1 m0 workflow]} (get (:products db) product-id)
+            (let [{:keys [m2 m1 workflow]} (get (:products db) product-id)
                   first-state (get-in workflow ["states" 0 "$id"])]
               (assoc db
                      :product-id product-id
-                     :m2 m2 :m1 m1 :m0 (or m0 "")
+                     :m2 m2 :m1 m1
                      :workflow workflow
                      :state-id first-state
                      :active-tab 0))))
@@ -160,7 +173,6 @@
 (rf/reg-sub :m3 (fn [db _] (:m3 db)))
 (rf/reg-sub :m2 (fn [db _] (:m2 db)))
 (rf/reg-sub :m1 (fn [db _] (:m1 db)))
-(rf/reg-sub :m0 (fn [db _] (:m0 db)))
 (rf/reg-sub :expanded (fn [db _] (:expanded db)))
 (rf/reg-sub :original-key (fn [db _] (:original-key db)))
 (rf/reg-sub :products (fn [db _] (:products db)))
@@ -206,47 +218,28 @@
   (when (not (empty? json)) (js->clj (.parse js/JSON json))))
 
 ;;------------------------------------------------------------------------------
-;; handlebars helpers
+;; Validation for M0 document fields
 
-(defn switch-helper [value options]
-  (this-as
-   this
-   (try
-     (set! ^js/string (.-_switch_value_ this) value)
-     (set! ^boolean (.-_switch_break_ this) false)
-     ((.-fn options) this)
-     (finally
-       (js-delete this "_switch_value_")
-       (js-delete this "_switch_break_")))))
-
-(defn case-helper [value options]
-  (this-as
-   this
-   (if (and
-        (= ^js/string (.-_switch_value_ this) value)
-        (not ^boolean (.-_switch_break_ this)))
-     (do
-       (set! ^boolean (.-_switch_break_ this) true)
-       ((.-fn options) this))
-     "")))
-
-(.registerHelper handlebars "switch" switch-helper)
-(.registerHelper handlebars "case" case-helper)
-
-(defn eq-helper [arg1 arg2 options]
-  (if (= arg1 arg2)
-    (.-fn options)
-    (.-inverse options)))
-
-(.registerHelper handlebars "eq" eq-helper)
-
-;; Configure marked to suppress deprecation warnings
-(.use marked (clj->js {:mangle false :headerIds false}))
-
-;;------------------------------------------------------------------------------
-
-(defn html-string [html]
-  [:div {:dangerouslySetInnerHTML {:__html html}}])
+(defn required-paths
+  "Walk an M2 schema and return a set of dot-separated paths for required fields.
+   E.g. #{\"lei\" \"payoff\" \"payoff.commercial_name\" ...}"
+  ([m2] (required-paths "" m2))
+  ([prefix m2]
+   (when (map? m2)
+     (let [req-set (set (get m2 "required"))
+           props (get m2 "properties")]
+       (reduce-kv
+        (fn [acc k prop-schema]
+          (let [full-path (if (seq prefix) (str prefix "." k) k)
+                acc (if (req-set k) (conj acc full-path) acc)]
+            ;; Recurse into nested objects
+            (if (and (map? prop-schema) (= "object" (get prop-schema "type")))
+              (into acc (required-paths full-path prop-schema))
+              ;; Also recurse into oneOf branches to find nested required fields
+              (if-let [one-of (get prop-schema "oneOf")]
+                (reduce (fn [a branch] (into a (required-paths full-path branch))) acc one-of)
+                acc))))
+        #{} (or props {}))))))
 
 ;;------------------------------------------------------------------------------
 
@@ -254,7 +247,6 @@
   (let [m3s (rf/subscribe [:m3])
         m2s (rf/subscribe [:m2])
         m1s (rf/subscribe [:m1])
-        m0s (rf/subscribe [:m0])
         expanded (rf/subscribe [:expanded])
         original-key (rf/subscribe [:original-key])
         products-sub (rf/subscribe [:products])
@@ -274,43 +266,63 @@
        (doall
         (map (fn [id] [:option {:key id :value id} id])
              (keys @products-sub)))]]
-     ;; MUI customer pane
+     ;; MUI customer pane + M0 document side by side
      (when @workflow-sub
-       [:div {:style {:padding "16px" :background "#fafafa" :border-bottom "2px solid #ddd"
-                      :max-width "960px" :margin "0 auto"}}
-        [view-forms {:m2 @m2s :m1 @m1s :workflow @workflow-sub
-                     :state-id @state-id-sub :active-tab @active-tab-sub
-                     :expanded (or @expanded #{})}]])
+       (let [m1 @m1s
+             m2 @m2s
+             doc (get m2 "$document")
+             show-doc? (some? m1)]
+         [:div {:style {:display "flex" :gap "16px" :padding "16px" :background "#fafafa"
+                        :border-bottom "2px solid #ddd" :max-width "1400px" :margin "0 auto"}}
+          ;; Customer form
+          [:div {:style (if show-doc? {:flex "1 1 60%" :min-width "400px"} {:flex "1 1 100%"})}
+           [view-forms {:m2 m2 :m1 m1 :workflow @workflow-sub
+                        :state-id @state-id-sub :active-tab @active-tab-sub
+                        :expanded (or @expanded #{})}]]
+          ;; M0 Document preview
+          (when show-doc?
+            [:div {:style {:flex "1 1 50%" :min-width "500px" :padding "32px"
+                           :border "1px solid #ccc" :border-radius "4px" :background "#fff"
+                           :box-shadow "0 2px 8px rgba(0,0,0,0.1)"
+                           :overflow-y "auto" :max-height "80vh" :font-size "14px"}}
+             (let [req (required-paths m2)]
+               (if doc
+                 ;; mdast $document embedded in M2
+                 [mdast-document doc req]
+                 ;; Auto-generated via ::m0 multimethod (Demo product)
+                 [document-view m2 m1 req]))])]))
      ;; Developer pane
      [:details {:open true}
       [:summary {:style {:padding "8px" :cursor "pointer" :background "#e0e0e0" :font-weight "bold"}} "Developer View"]
-      [:main
-       [:table {:align "center"}
+      [:main {:style {:overflow-x "auto"}}
+       [:table {:class "dev-table"}
+        [:thead
+         [:tr
+          [:th "M3 Editor"]
+          [:th "M3 JSON"]
+          [:th "M2 Editor"]
+          [:th "M2 JSON"]
+          [:th "M1 Editor"]
+          [:th "M1 JSON"]]]
         [:tbody
          [:tr
-          [:td
-           [:table
-            [:caption]
-            [:thead
-             [:tr
-              [:th "M3 Editor"]
-              [:th "M3 JSON"]
-              [:th "M2 Editor"]
-              [:th "M2 JSON"]
-              [:th "M1 Editor"]
-              [:th "M1 JSON"]
-              [:th "M0 Template"]
-              [:th "M0 Document"]]]
-            [:tbody
-             [:tr
-              [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s) {:draft "latest" :root @m3s :$ref-merger :merge-over} [:m3] nil @m3s)]]]]]
-              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only true :value (pretty @m3s)}]]
-              [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s) {:draft "latest" :root @m2s :$ref-merger :merge-over} [:m2] nil @m2s)]]]]]
-              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value (clj->json @m2s) :on-change (fn [event] (rf/dispatch [:assoc-in [:m2] (json->clj (.-value (.-target event)))]))}]]
-              [:td {:valign :top} [:table [:tbody [:tr [:td ((render-1 {:draft "latest" :root @m2s :$ref-merger :merge-over :check-format check-formats :expanded @expanded} [:m2] nil @m2s) {:draft "latest" :root @m1s :$ref-merger :merge-over} [:m1] nil @m1s)]]]]]
-              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value (clj->json @m1s) :on-change (fn [event] (rf/dispatch [:assoc-in [:m1] (json->clj (.-value (.-target event)))]))}]]
-              [:td {:valign :top} [:textarea {:rows 180 :cols 50 :read-only false :value @m0s :on-change (fn [event] (rf/dispatch [:assoc-in [:m0] (.-value (.-target event))]))}]]
-              [:td {:valign :top} [html-string (let [m1 @m1s m0 @m0s] (when (and m1 m0) (.parse marked ((.compile handlebars m0) (clj->js m1)))))]]]]]]]]]]]]))
+          [:td {:class "dev-editor"}
+           ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s)
+            {:draft "latest" :root @m3s :$ref-merger :merge-over} [:m3] nil @m3s)]
+          [:td {:class "dev-json"}
+           [:textarea {:rows 50 :cols 50 :read-only true :value (pretty @m3s)}]]
+          [:td {:class "dev-editor"}
+           ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s)
+            {:draft "latest" :root @m2s :$ref-merger :merge-over} [:m2] nil @m2s)]
+          [:td {:class "dev-json"}
+           [:textarea {:rows 50 :cols 50 :read-only false :value (clj->json @m2s)
+                       :on-change (fn [event] (rf/dispatch [:assoc-in [:m2] (json->clj (.-value (.-target event)))]))}]]
+          [:td {:class "dev-editor"}
+           ((render-1 {:draft "latest" :root @m2s :$ref-merger :merge-over :check-format check-formats :expanded @expanded} [:m2] nil @m2s)
+            {:draft "latest" :root @m1s :$ref-merger :merge-over} [:m1] nil @m1s)]
+          [:td {:class "dev-json"}
+           [:textarea {:rows 50 :cols 50 :read-only false :value (clj->json @m1s)
+                       :on-change (fn [event] (rf/dispatch [:assoc-in [:m1] (json->clj (.-value (.-target event)))]))}]]]]]]]]))
 
 ;; -------------------------
 ;; Initialize app
@@ -322,12 +334,12 @@
 
 (defn ^:export init! []
   (let [default-id "Final Terms"
-        {:keys [m2 m1 m0 workflow]} (products default-id)]
+        {:keys [m2 m1 workflow]} (products default-id)]
     (rf/dispatch [:initialise
                   {:m3 m3
                    :products products
                    :product-id default-id
-                   :m2 m2 :m1 m1 :m0 (or m0 "")
+                   :m2 m2 :m1 m1
                    :workflow workflow
                    :state-id (get-in workflow ["states" 0 "$id"])
                    :active-tab 0

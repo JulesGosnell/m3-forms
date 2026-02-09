@@ -43,3 +43,135 @@ a:hover {
 .invalid {
     border: 2px solid red;
 }
+
+/* Developer view */
+.dev-table {
+    border-collapse: collapse;
+    margin: 0 auto;
+}
+
+.dev-table th {
+    padding: 4px 8px;
+    background: #e8e8e8;
+    border: 1px solid #ccc;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.dev-table td {
+    vertical-align: top;
+    border: 1px solid #eee;
+}
+
+.dev-editor {
+    min-width: 280px;
+    overflow: auto;
+    padding: 4px;
+}
+
+.dev-json textarea {
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+/* M0 WYSIWYG edit mode */
+.m0-editable .m0-field {
+    border-bottom: 1px dashed #1976d2;
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 2px;
+    transition: background-color 0.15s;
+}
+
+.m0-editable .m0-field:hover {
+    background-color: rgba(25, 118, 210, 0.1);
+}
+
+/* M0 field states: absent / null / empty */
+.m0-field-absent {
+    border-bottom: 1px dashed #999;
+}
+
+.m0-field-null {
+    border-bottom: 1px dashed #ed6c02;
+}
+
+.m0-field-empty {
+    border-bottom: 1px dotted #999;
+    min-width: 2em;
+    display: inline-block;
+}
+
+/* M0 validation — applied by post-render validation pass */
+.m0-field-invalid {
+    border-bottom: 2px solid #d32f2f;
+    background-color: rgba(211, 47, 47, 0.06);
+}
+
+.m0-editable .m0-field-invalid {
+    border-bottom: 2px dashed #d32f2f;
+}
+
+.m0-editable .m0-field-invalid:hover {
+    background-color: rgba(211, 47, 47, 0.12);
+}
+
+/* Placeholder for absent fields */
+.m0-placeholder {
+    color: #999;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Null indicator */
+.m0-null {
+    color: #ed6c02;
+    font-style: italic;
+    font-size: 0.85em;
+}
+
+/* Auto-generated M0 document tables */
+.m0-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0;
+}
+
+.m0-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+/* M0 document definition lists */
+section dl {
+    margin: 0;
+}
+
+section dt {
+    font-weight: 600;
+    color: #555;
+    margin-top: 8px;
+}
+
+section dd {
+    margin-left: 16px;
+    margin-bottom: 4px;
+}
+
+/* Drag handle for array items */
+.drag-handle {
+    cursor: grab;
+    color: #999;
+    user-select: none;
+    padding: 0 4px;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-over {
+    border-top: 2px solid #1976d2;
+}

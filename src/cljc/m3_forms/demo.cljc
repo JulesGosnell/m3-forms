@@ -123,3 +123,10 @@
    "a-SmallInteger" 9
    "an-additional-string" "hello!"
    "another-additional-string" "goodbye!"))
+
+(def demo-workflow-m1
+  {"$schema" "/schemas/workflow"
+   "$id" "demo-workflow"
+   "states"
+   [{"$id" "everything"
+     "views" [["everything"]]}]})

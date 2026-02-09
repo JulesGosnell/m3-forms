@@ -116,7 +116,157 @@
     "pensions"
     {"title" "Pensions" "type" "array" "items" {"$ref" "#/$defs/PensionAsset"}}
     "incomes"
-    {"title" "Annual Incomes" "type" "array" "items" {"$ref" "#/$defs/Income"}})})
+    {"title" "Annual Incomes" "type" "array" "items" {"$ref" "#/$defs/Income"}})
+
+   "$document"
+   {"type" "root"
+    "children"
+    [{"type" "heading" "depth" 2 "children" [{"type" "text" "value" "Financial Disclosure \u2014 Form E"}]}
+     {"type" "thematicBreak"}
+     ;; Personal Information
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Personal Information"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "children" [{"type" "strong" "children" [{"type" "text" "value" "Full Name"}]}]}
+         {"type" "tableCell" "children"
+          [{"type" "fieldReference" "path" "personalInformation.fullName" "description" "Full name of the party" "schemaType" "string"}]}]}
+       {"type" "tableRow" "children"
+        [{"type" "tableCell" "children" [{"type" "strong" "children" [{"type" "text" "value" "Telephone"}]}]}
+         {"type" "tableCell" "children"
+          [{"type" "fieldReference" "path" "personalInformation.telephoneNumber" "description" "Telephone number" "schemaType" "string"}]}]}
+       {"type" "tableRow" "children"
+        [{"type" "tableCell" "children" [{"type" "strong" "children" [{"type" "text" "value" "Email"}]}]}
+         {"type" "tableCell" "children"
+          [{"type" "fieldReference" "path" "personalInformation.emailAddress" "description" "Email address" "schemaType" "string"}]}]}]}
+     {"type" "paragraph" "children"
+      [{"type" "strong" "children" [{"type" "text" "value" "Address: "}]}
+       {"type" "fieldReference" "path" "personalInformation.address" "description" "Address" "schemaType" "string"}]}
+     {"type" "thematicBreak"}
+     ;; Section 1 — Property
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 1 \u2014 Property (Legal Title)"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Property Address"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Value"}]}]}
+       {"type" "each" "path" "property" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "address" "description" "Property address" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Property value" "schemaType" "integer" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 2 — Bank Accounts
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 2 \u2014 Bank Accounts / Cash"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Account"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Sort Code"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Account No."}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Balance"}]}]}
+       {"type" "each" "path" "bankAccounts" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "account.description" "description" "Account name" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "account.sortCode" "description" "Sort code" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "account.accountNumber" "description" "Account number" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Balance" "schemaType" "number" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 3 — Investments
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 3 \u2014 Investments / Policies"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Company"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Account No."}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Value"}]}]}
+       {"type" "each" "path" "investments" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "account.description" "description" "Company" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "account.accountId" "description" "Account number" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Value" "schemaType" "integer" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 4 — Business Interests
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 4 \u2014 Business Interests"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Name"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Reg. No."}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Bank Balance"}]}]}
+       {"type" "each" "path" "businesses" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "name" "description" "Business name" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "number" "description" "Registered number" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "bankAccount.value" "description" "Bank balance" "schemaType" "number" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 5 — Chattels
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 5 \u2014 Chattels"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Description"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Value"}]}]}
+       {"type" "each" "path" "chattels" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "description" "description" "Description" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Value" "schemaType" "integer" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 6 — Liabilities
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 6 \u2014 Liabilities"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Creditor"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Amount"}]}]}
+       {"type" "each" "path" "liabilities" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "description" "description" "Creditor" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Liability" "schemaType" "integer" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 7 — Pensions
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 7 \u2014 Pensions"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Company"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Plan No."}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Value"}]}]}
+       {"type" "each" "path" "pensions" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "description" "description" "Company" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "planNumber" "description" "Plan number" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Value" "schemaType" "integer" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Section 8 — Annual Incomes
+     {"type" "heading" "depth" 3 "children" [{"type" "text" "value" "Section 8 \u2014 Annual Incomes"}]}
+     {"type" "table" "children"
+      [{"type" "tableRow" "children"
+        [{"type" "tableCell" "header" true "children" [{"type" "text" "value" "Source"}]}
+         {"type" "tableCell" "header" true "children" [{"type" "text" "value" "Amount"}]}]}
+       {"type" "each" "path" "incomes" "children"
+        [{"type" "tableRow" "children"
+          [{"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "description" "description" "Source" "schemaType" "string"}]}
+           {"type" "tableCell" "children"
+            [{"type" "fieldReference" "path" "value" "description" "Income" "schemaType" "integer" "format" "money"}]}]}]}]}
+     {"type" "thematicBreak"}
+     ;; Declaration
+     {"type" "paragraph" "children"
+      [{"type" "emphasis" "children"
+        [{"type" "text" "value" "I declare that the information given above is a full, frank and clear disclosure of my financial and other relevant circumstances."}]}]}
+     {"type" "paragraph" "children"
+      [{"type" "text" "value" "Signature: ____________________________  Date: ____________"}]}]}})
 
 (def divorce-m1
   (array-map

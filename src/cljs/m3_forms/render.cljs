@@ -92,6 +92,8 @@
           (r c1 p1 k1 (json/expand-$ref c2 p1 m1))))
       (fn [_c1 _p1 _k1 _m1] nil))))
 
+(derive ::m0 ::html5)
+
 (defmethod render-2 :default [c2 p2 k2 m2]
   (let [rk (render-key c2 m2)]
     (fn [c1 p1 k1 m1]
@@ -200,7 +202,7 @@
         result
         (cond
           m2t {"type" m2t}
-          m1t ({"boolean" true "string" "" "integer" 0 "number" 0.0 "null" nil} m1t)
+          m1t ({"boolean" true "string" "" "integer" 0 "number" 0.0 "null" nil "array" [] "object" {}} m1t)
           (= m1t "boolean") true
           one-of-m3 {"oneOf" []}
           any-of-m3 {"anyOf" []}
@@ -349,7 +351,7 @@
                          {:on-click (fn [e] (println "CLICK:") (rf/dispatch [:update-in p1 conjm [(str "property-" (count (when (present? m1) m1))) (get-m1 c2 p2 aps)]]))}
                          "+"]]]]))]]]])]]))])))
 
-(defn render-array [minIs maxIs read-only? v? parent-path m1 rows]
+(defn render-array [minIs maxIs read-only? v? parent-path m1 rows on-add]
   [:div {:style {:background "#ffcccc"} :class v?}
    [:table
     [:tbody
@@ -357,13 +359,35 @@
       (concat
        (map
         (fn [[path k fixed? delete-f td]]
-          [:tr {:key (make-id path)}
-           [:td td]
-           [:td (when (and (not read-only?) fixed?) [:button  {:on-click (fn [_e] (rf/dispatch [:update-in parent-path delete-f k]))} "-"])]])
+          (let [draggable? (and (not read-only?) fixed?)]
+            [:tr {:key (make-id path)
+                  :draggable draggable?
+                  :on-drag-start (fn [e]
+                                   (.setData (.-dataTransfer e) "text/plain" (str k))
+                                   (set! (.-effectAllowed (.-dataTransfer e)) "move"))
+                  :on-drag-over (fn [e]
+                                  (.preventDefault e)
+                                  (set! (.-dropEffect (.-dataTransfer e)) "move")
+                                  (let [tr (.closest (.-target e) "tr")]
+                                    (when tr (.add (.-classList tr) "drag-over"))))
+                  :on-drag-leave (fn [e]
+                                   (let [tr (.closest (.-target e) "tr")]
+                                     (when tr (.remove (.-classList tr) "drag-over"))))
+                  :on-drop (fn [e]
+                             (.preventDefault e)
+                             (let [tr (.closest (.-target e) "tr")]
+                               (when tr (.remove (.-classList tr) "drag-over")))
+                             (let [from-idx (js/parseInt (.getData (.-dataTransfer e) "text/plain") 10)]
+                               (when-not (= from-idx k)
+                                 (rf/dispatch [:array-reorder parent-path from-idx k]))))}
+             [:td {:class "drag-handle" :style {:width "20px"}} (when draggable? "\u2261")]
+             [:td td]
+             [:td (when draggable? [:button {:on-click (fn [_e] (rf/dispatch [:update-in parent-path delete-f k]))} "-"])]]))
         rows)
        (when (and (not read-only?) (or (not maxIs) (< (count (when (present? m1) m1)) maxIs)))
          [[:tr {:key (make-id (conjv parent-path "plus")) :align :center}
-           [:td [:button  {:on-click (fn [_e])} "+"]]]])))]]])
+           [:td]
+           [:td [:button {:on-click on-add} "+"]]]])))]]])
 
 (defmethod render-2 [::html5 "array" :default]
   [c2 p2 k2 {{def "default" :as is} "items" pis "prefixItems" minIs "minItems" maxIs "maxItems" ro "readOnly" :as m2}]
@@ -380,8 +404,9 @@
              (range)
              (concat (map (juxt (constantly true) identity) pis)
                      (map (juxt (constantly false)  identity) (repeat is)))
-             (let [m1 (when (present? m1) m1)] (concat m1 (repeat (- (count pis) (count m1)) nil))))]
-        (render-array minIs maxIs ro (v? c1 m1) p1 m1 rows)))))
+             (let [m1 (when (present? m1) m1)] (concat m1 (repeat (- (count pis) (count m1)) nil))))
+            on-add (fn [_e] (rf/dispatch [:update-in p1 (fnil conj []) (get-m1 c2 p2 is)]))]
+        (render-array minIs maxIs ro (v? c1 m1) p1 m1 rows on-add)))))
 
 (defmethod render-2 [::html5 "oneOf" :default]
   [c2 p2 k2 {oos "oneOf" t "title" des "description" :as m2}]

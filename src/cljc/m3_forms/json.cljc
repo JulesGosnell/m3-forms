@@ -110,13 +110,55 @@
 
 ;;------------------------------------------------------------------------------
 
+;; Legacy sentinel — used by renderers and meld. Prefer option-get below.
 (def absent :absent)
+(defn absent? [v] (= absent v))
+(defn present? [v] (not (absent? v)))
 
-(defn absent? [v]
-  (= absent v))
+;;------------------------------------------------------------------------------
+;; Option type — models map values as options to distinguish absent from nil.
+;; Inspired by theremin.utils/maybe-get.
+;;
+;;   nil  = absent  (key doesn't exist in the map)
+;;   [v]  = present (key exists, value is v — even if v is nil)
+;;
+;; Usage:
+;;   (when-let [[v] (option-get m "key")] ...)  — destructure present value
+;;   (if (option-get m "key") "present" "absent") — existence check
+;;   (option-get {"a" nil} "a") => [nil]  — present with nil
+;;   (option-get {"a" nil} "b") => nil    — absent
 
-(defn present? [v]
-  (not (absent? v)))
+(def ^:private secret #?(:clj (java.lang.Object.) :cljs (js/Object.)))
+
+(defn option-get
+  "Like get but returns an option: [v] if key present, nil if absent.
+   Uses an unforgeable sentinel so nil values are never confused with absence."
+  [m k]
+  (let [v (get m k secret)]
+    (when-not (identical? v secret) [v])))
+
+(defn option-get-in
+  "Like get-in but returns an option. Returns nil if any key in path is absent."
+  [m path]
+  (let [result (reduce
+                (fn [m k]
+                  (if (and (associative? m) (contains? m k))
+                    (get m k)
+                    (reduced secret)))
+                m path)]
+    (when-not (identical? result secret) [result])))
+
+(defn option-assoc
+  "Like assoc but takes an option value: [v] sets the key, nil removes it."
+  [m k opt]
+  (if (some? opt)
+    (assoc m k (first opt))
+    (dissoc m k)))
+
+(defn option-update
+  "Like update but f receives and returns options."
+  [m k f & args]
+  (option-assoc m k (apply f (option-get m k) args)))
 
 ;;------------------------------------------------------------------------------
 

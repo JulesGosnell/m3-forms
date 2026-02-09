@@ -247,7 +247,9 @@
            (when (draft? "draft2021-12")
              ["$defs" {"type" "object"
                        "additionalProperties"
-                       {"$ref" (->def "schemaM3")}}])))}
+                       {"$ref" (->def "schemaM3")}}])
+           ;; M0 document model — mdast tree embedded in M2
+           ["$document" {"type" "object"}]))}
 
         one-of-m3
         {"title" "OneOf"
