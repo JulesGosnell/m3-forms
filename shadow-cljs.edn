@@ -1,4 +1,4 @@
-{:source-paths ["src/cljc" "src/cljs"]
+{:source-paths ["src/cljc" "src/cljs" "test/cljc"]
 
  :dev-http {8280 "resources/public"}
 
@@ -11,4 +11,9 @@
                 :output-dir "resources/public/js"
                 :asset-path "/js"
                 :modules {:app {:init-fn m3-forms.core/init!}}
-                :devtools {:after-load m3-forms.core/re-render}}}}
+                :devtools {:after-load m3-forms.core/re-render}}
+
+          :test {:target :node-test
+                 :output-to "target/test/node-tests.js"
+                 :ns-regexp "-test$"
+                 :autorun true}}}
