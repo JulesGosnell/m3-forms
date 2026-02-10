@@ -66,8 +66,8 @@
 
 (defn squidgy-button [expanded path]
   (if (expanded path)
-    [:td [:button {:on-click (fn [e] (rf/dispatch [:collapse path]))} "v"]]
-    [:td [:button {:on-click (fn [e] (rf/dispatch [:expand path]))} "^"]]))
+    [:td [:button {:class "dev-btn" :on-click (fn [e] (rf/dispatch [:collapse path]))} "\u25BE"]]
+    [:td [:button {:class "dev-btn" :on-click (fn [e] (rf/dispatch [:expand path]))} "\u25B8"]]))
 
 (defn squidgy? [{oo "oneOf" t "type" :as m2} m1]
   (cond
@@ -104,8 +104,8 @@
   (let [v? (valid? c2 m2)]
     (fn [c1 p1 k1 m1]
       (log "NULL:" p1 k1 m1)
-      [:div {:style {:background "#cc99ff"} :class (v? c1 m1)}
-       [:button {:on-click (fn [e] (rf/dispatch [:assoc-in p1 nil]))} "+"]])))
+      [:div {:class (str "dev-node dev-node-null " (v? c1 m1))}
+       [:button {:class "dev-btn dev-btn-add" :on-click (fn [e] (rf/dispatch [:assoc-in p1 nil]))} "+"]])))
 
 (defmethod render-2 [::html5 "boolean" :default]
   [c2 p2 k2
@@ -113,7 +113,7 @@
   (let [v? (valid? c2 m2)
         ro (boolean c)]
     (fn [c1 p1 k1 m1]
-      [:div {:style {:background "#ffcc66"} :class (v? c1 m1)}
+      [:div {:class (str "dev-node dev-node-boolean " (v? c1 m1))}
        [:input {:type "checkbox" :read-only ro
                 :checked (and (present? m1) m1)
                 :on-change (fn [e] (rf/dispatch [:assoc-in p1 (.-checked (.-target e))]))}]])))
@@ -125,7 +125,7 @@
         ddes (map (juxt identity identity) es)]
     (fn [c1 p1 k1 m1]
       (log "NUMBER:" p1 k1 m1)
-      [:div {:style {:background "#99ff99"} :class (v? c1 m1)}
+      [:div {:class (str "dev-node dev-node-number " (v? c1 m1))}
        (if (seq es)
          (drop-down c2 p1 ddes (when (present? m1) m1))
          [:input {:type f  :max max :min min :step mo :placeholder d :read-only ro :value (or c (when (present? m1) m1))
@@ -150,7 +150,7 @@
         ddes (map (juxt identity identity) es)]
     (fn [c1 p1 k1 m1]
       (log "INTEGER:" p1 k1 m1)
-      [:div {:style {:background "#ccff33"} :class (v? c1 m1)}
+      [:div {:class (str "dev-node dev-node-integer " (v? c1 m1))}
        (if (seq es)
          (drop-down c2 p1 ddes (when (present? m1) m1))
          [:input {:type f :max max :min min :step mo :placeholder d :read-only ro :value (or c (when (present? m1) m1))
@@ -175,7 +175,7 @@
         ddes (map (juxt identity identity) es)]
     (fn [c1 p1 k1 m1]
       (log "STRING:" p1 k1 m1)
-      [:div {:style {:background "#ffff99"} :class (v? c1 m1)}
+      [:div {:class (str "dev-node dev-node-string " (v? c1 m1))}
        (if (seq es)
          (drop-down c2 p1 ddes (when (present? m1) m1))
          [:input {:type f :placeholder d :value (when (present? m1) m1) :readOnly readOnly :minLength minL :maxLength maxL :size maxL
@@ -194,6 +194,7 @@
 (defmethod render-2 [::html5 "string" "bank-sort-code"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
 (defmethod render-2 [::html5 "string" "bank-account-number"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
 (defmethod render-2 [::html5 "string" "telephone-number"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
+(defmethod render-2 [::html5 "string" "mdast-ref"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
 (defmethod render-2 [::html5 "integer" "money"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "number"))
 (defmethod render-2 [::html5 "number" "money"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "number"))
 
@@ -221,7 +222,7 @@
   (let [v? (valid? c2 m2)]
     (fn [c1 p1 k1 m1]
       (log "OBJECT:" "M2:" [p2 k2 m2] "M1:" [p1 k1 m1])
-      [:div {:style {:background "#99ccff"} :class (v? c1 m1)}
+      [:div {:class (str "dev-node dev-node-object " (v? c1 m1))}
        (if (seq es)
          (drop-down c2 p1 (map (juxt (fn [{t "title"}] t) identity) es) (when (present? m1) m1))
          (let [extra-ps-m1 (apply dissoc (when (present? m1) m1) (keys ps))
@@ -232,7 +233,7 @@
                                        extra-ps-m1))
                pattern-ps-m1 (map second pattern-ps-m2s-and-m1)
                additional-ps (apply dissoc extra-ps-m1 (keys pattern-ps-m1))]
-           [:table {:border 1}
+           [:table
             (when title [:caption [:h4 title]])
             [:tbody
              (when ps
@@ -241,8 +242,8 @@
                                (.preventDefault e)
                                (rf/dispatch [:move (rdr/read-string (.getData (.-dataTransfer e) "m1")) p1]))}
                 [:td
-                 [:table {:border 1}
-                  [:caption "Named Properties"]
+                 [:table
+                  [:caption [:span.dev-section-label "Named Properties"]]
                   [:tbody
                    (doall
                     (map
@@ -263,20 +264,20 @@
                                          (.stopPropagation e)
                                          (rf/dispatch [:move (rdr/read-string (.getData (.-dataTransfer e) "m1")) p1]))}
                           [:td
-                           [:table {:border 1}
+                           [:table
                             (when t [:caption [:h4 t]])
                             [:tbody
                              [:tr
-                              [:td [:input {:type "text" :value k :read-only true}]]
+                              [:td [:span.dev-prop-name k]]
                               (when visible? [:td ((render-1 c2 p2 k m2) c1 p1 k (get (when (present? m1) m1) k absent))])
                               (when squidgable? (squidgy-button expanded? p2))
-                              [:td [:button {:on-click (fn [e] (rf/dispatch [:delete-in p1]))} "-"]]]]]]]))
+                              [:td [:button {:class "dev-btn dev-btn-remove" :on-click (fn [e] (rf/dispatch [:delete-in p1]))} "\u00D7"]]]]]]]))
                      ps))]]]])
              (when pps
                [:tr
                 [:td
-                 [:table {:border 1}
-                  [:caption "Pattern Properties"]
+                 [:table
+                  [:caption [:span.dev-section-label "Pattern Properties"]]
                   [:tbody
                    (concat
                     (map
@@ -285,9 +286,9 @@
                              id2 (make-id p2)
                              r (render-1 c2 p2 pattern schema)]
                          [:tr {:key id2 :id  id2 :title pattern}
-                          [:td [:input {:type "text" :value pattern :read-only true}]]
+                          [:td [:span.dev-prop-name pattern]]
                           [:td
-                           [:table  {:border 1}
+                           [:table
                             [:tbody
                              (map
                               (fn [[k v]]
@@ -303,8 +304,8 @@
                                (when (present? m1) m1)))]]]]))
                      pps)
                     [[:tr {:key (make-id (conjv p2 "plus")) :align :center}
-                      [:td [:button "+"]]
-                      [:td [:button "+"]]]])]]]])
+                      [:td [:button {:class "dev-btn dev-btn-add"} "+"]]
+                      [:td [:button {:class "dev-btn dev-btn-add"} "+"]]]])]]]])
 
              (when aps
                [:tr {:onDragOver (fn [e] (.preventDefault e))
@@ -312,8 +313,8 @@
                                (.preventDefault e)
                                (rf/dispatch [:move (rdr/read-string (.getData (.-dataTransfer e) "m2")) p1]))}
                 [:td
-                 [:table {:border 1}
-                  [:caption "Additional Properties"]
+                 [:table
+                  [:caption [:span.dev-section-label "Additional Properties"]]
                   [:tbody
                    (doall
                     (concat
@@ -326,7 +327,7 @@
                               id (make-id (if ok2 (conjv old-p1 ok2) p1))]
                           [:tr {:key id}
                            [:td
-                            [:table {:border 1}
+                            [:table
                              [:tbody
                               [:tr {:draggable (= "properties" k2)
                                     :onDragStart (fn [e] (.setData (.-dataTransfer e) "m2" p1))
@@ -342,17 +343,18 @@
                                              :onBlur (fn [e] (rf/dispatch [:rename-in-tidy]))}]]
                                (when (expanded? (conj p2 k)) [:td ((render-1 c2 p2 k (when (map? aps) aps)) c1 p1 k v)])
                                (squidgy-button expanded? (conj p2 k))
-                               [:td [:button {:on-click (fn [e] (rf/dispatch [:delete-in p1]))} "-"]]]]]]]))
+                               [:td [:button {:class "dev-btn dev-btn-remove" :on-click (fn [e] (rf/dispatch [:delete-in p1]))} "\u00D7"]]]]]]]))
                       (range)
                       additional-ps)
                      [[:tr {:key (make-id (conjv p1 "plus")) :align :center}
                        [:td
                         [:button
-                         {:on-click (fn [e] (println "CLICK:") (rf/dispatch [:update-in p1 conjm [(str "property-" (count (when (present? m1) m1))) (get-m1 c2 p2 aps)]]))}
+                         {:class "dev-btn dev-btn-add"
+                          :on-click (fn [e] (rf/dispatch [:update-in p1 conjm [(str "property-" (count (when (present? m1) m1))) (get-m1 c2 p2 aps)]]))}
                          "+"]]]]))]]]])]]))])))
 
 (defn render-array [minIs maxIs read-only? v? parent-path m1 rows on-add]
-  [:div {:style {:background "#ffcccc"} :class v?}
+  [:div {:class (str "dev-node dev-node-array " v?)}
    [:table
     [:tbody
      (doall
@@ -382,12 +384,12 @@
                                  (rf/dispatch [:array-reorder parent-path from-idx k]))))}
              [:td {:class "drag-handle" :style {:width "20px"}} (when draggable? "\u2261")]
              [:td td]
-             [:td (when draggable? [:button {:on-click (fn [_e] (rf/dispatch [:update-in parent-path delete-f k]))} "-"])]]))
+             [:td (when draggable? [:button {:class "dev-btn dev-btn-remove" :on-click (fn [_e] (rf/dispatch [:update-in parent-path delete-f k]))} "\u00D7"])]]))
         rows)
        (when (and (not read-only?) (or (not maxIs) (< (count (when (present? m1) m1)) maxIs)))
          [[:tr {:key (make-id (conjv parent-path "plus")) :align :center}
            [:td]
-           [:td [:button {:on-click on-add} "+"]]]])))]]])
+           [:td [:button {:class "dev-btn dev-btn-add" :on-click on-add} "+"]]]])))]]])
 
 (defmethod render-2 [::html5 "array" :default]
   [c2 p2 k2 {{def "default" :as is} "items" pis "prefixItems" minIs "minItems" maxIs "maxItems" ro "readOnly" :as m2}]
@@ -423,7 +425,7 @@
         (when (> num-valid 1)
           (log/warn (str "oneOf: " num-valid " schemas matched, using first match")))
         (if (or (absent? m1) (>= num-valid 1))
-          [:div {:title des :style {:background "#cc6699"} :class (v? c1 m1)}
+          [:div {:title des :class (str "dev-node dev-node-oneof " (v? c1 m1))}
            [:table
             [:caption
              [:h4

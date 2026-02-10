@@ -18,6 +18,7 @@
   with standalone implementations (and eventually the m3 validator)."
   (:require
    [clojure.string :as str]
+   [m3-forms.mdast-schema :as mdast-schema]
    [m3-forms.visit :refer [maybe-update visit-schema]]))
 
 ;;------------------------------------------------------------------------------
@@ -53,8 +54,8 @@
     schema
     (loop [schema schema seen #{}]
       (if-let [ref (get schema "$ref")]
-        (if (contains? seen ref)
-          (dissoc schema "$ref") ;; break circular $ref
+        (if (or (not (string? ref)) (contains? seen ref))
+          (dissoc schema "$ref") ;; break circular $ref or non-string ref
           (let [[_base fragment] (str/split ref #"#" 2)]
             (if fragment
               (if-let [resolved (resolve-json-pointer root fragment)]
@@ -214,7 +215,8 @@
          (when (draft? "draft2020-12") [])
          (when (draft? "draft2021-12") [])
          ["unknown" "year-month" "range" "money"
-          "bank-account-number" "bank-sort-code" "telephone-number"])
+          "bank-account-number" "bank-sort-code" "telephone-number"
+          "mdast-ref"])
 
         common-properties-m3
         {"type" "object"
@@ -249,7 +251,7 @@
                        "additionalProperties"
                        {"$ref" (->def "schemaM3")}}])
            ;; M0 document model — mdast tree embedded in M2
-           ["$document" {"type" "object"}]))}
+           ["$document" {"$ref" (->def "mdastRoot")}]))}
 
         one-of-m3
         {"title" "OneOf"
@@ -454,22 +456,24 @@
           {"$ref" (->def "booleanM2")}]}
 
         definitions-m3
-        (array-map
-         "commonPropertiesM3" common-properties-m3
-         "nullM3" null-m3
-         "booleanM3" boolean-m3
-         "numberM3" number-m3
-         "integerM3" integer-m3
-         "stringM3" string-m3
-         "objectM3" object-m3
-         "arrayM3" array-m3
-         "oneOfM3" one-of-m3
-         "anyOfM3" any-of-m3
-         "allOfM3" all-of-m3
-         "notM3" not-m3
-         "typeArrayM3" type-array-m3
-         "booleanM2" boolean-m2
-         "schemaM3" schema-m3)
+        (merge
+         (array-map
+          "commonPropertiesM3" common-properties-m3
+          "nullM3" null-m3
+          "booleanM3" boolean-m3
+          "numberM3" number-m3
+          "integerM3" integer-m3
+          "stringM3" string-m3
+          "objectM3" object-m3
+          "arrayM3" array-m3
+          "oneOfM3" one-of-m3
+          "anyOfM3" any-of-m3
+          "allOfM3" all-of-m3
+          "notM3" not-m3
+          "typeArrayM3" type-array-m3
+          "booleanM2" boolean-m2
+          "schemaM3" schema-m3)
+         (mdast-schema/all-mdast-defs ->def))
 
         m3
         {"$id" "/schemas/metaschema"

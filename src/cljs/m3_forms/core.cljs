@@ -23,7 +23,7 @@
    [day8.re-frame.tracing :refer-macros [fn-traced]]
    [m3-forms.log :as log]
 
-   [m3-forms.util     :refer [index-by-$id check-formats]]
+   [m3-forms.util     :refer [index-by-$id check-formats make-check-formats]]
    [m3-forms.schema   :refer [make-m3]]
    [m3-forms.json     :refer [json-insert-in json-remove-in option-get-in insertv deletev]]
    [m3-forms.migrate  :refer [migrate]]
@@ -76,36 +76,47 @@
 (rf/reg-event-db :rename-in-tidy (fn-traced [& args] (apply do-rename-in-tidy args)))
 
 (defn do-rename-in [{ok :original-key ck :current-key m2 :m2 m1 :m1 z :zip :as db} [_ path old-k new-k]]
-  (let [old-k (or ck old-k)
-        migration
-        {"type" "rename"
-         "m2-path" (vec (rest path))
-         "m1-path" (vec (rest (butlast (z (conj path old-k)))))
-         "source" old-k
-         "target" new-k}
-        m2-ctx {:draft "latest" :$ref-merger :merge-over}
-        m1-ctx {:draft "latest" :$ref-merger :merge-over}
-        [m2 [m1]] (migrate m1-ctx m2-ctx migration [m2 [m1]])]
-    (assoc
-     db
-     :m2 m2
-     :m1 m1
-     :current-key new-k
-     :original-key {[path new-k] (or (get ok [path old-k]) old-k)})))
+  (let [old-k (or ck old-k)]
+    (if z
+      (let [migration
+            {"type" "rename"
+             "m2-path" (vec (rest path))
+             "m1-path" (vec (rest (butlast (z (conj path old-k)))))
+             "source" old-k
+             "target" new-k}
+            m2-ctx {:draft "latest" :$ref-merger :merge-over}
+            m1-ctx {:draft "latest" :$ref-merger :merge-over}
+            [m2 [m1]] (migrate m1-ctx m2-ctx migration [m2 [m1]])]
+        (assoc db :m2 m2 :m1 m1
+               :current-key new-k
+               :original-key {[path new-k] (or (get ok [path old-k]) old-k)}))
+      ;; Fallback: simple rename when zip mapping is unavailable
+      (let [parent (get-in db path)
+            v (get parent old-k)
+            updated (-> parent (dissoc old-k) (assoc new-k v))]
+        (assoc-in
+         (assoc db :current-key new-k
+                :original-key {[path new-k] (or (get ok [path old-k]) old-k)})
+         path updated)))))
 
 (rf/reg-event-db :rename-in (fn-traced [& args] (apply do-rename-in args)))
 
 ;;------------------------------------------------------------------------------
 
 (defn do-delete-in [{m2 :m2 m1 :m1 z :zip :as db} [_ path]]
-  (let [migration
-        {"type" "delete"
-         "m2-path" (vec (rest path))
-         "m1-path" (vec (rest (z path)))}
-        m2-ctx {:draft "latest" :$ref-merger :merge-over}
-        m1-ctx {:draft "latest" :$ref-merger :merge-over}
-        [m2 [m1]] (migrate m2-ctx m1-ctx migration [m2 [m1]])]
-    (assoc db :m2 m2 :m1 m1)))
+  (if z
+    (let [migration
+          {"type" "delete"
+           "m2-path" (vec (rest path))
+           "m1-path" (vec (rest (z path)))}
+          m2-ctx {:draft "latest" :$ref-merger :merge-over}
+          m1-ctx {:draft "latest" :$ref-merger :merge-over}
+          [m2 [m1]] (migrate m2-ctx m1-ctx migration [m2 [m1]])]
+      (assoc db :m2 m2 :m1 m1))
+    ;; Fallback: simple dissoc when zip mapping is unavailable
+    (let [parent-path (vec (butlast path))
+          k (last path)]
+      (update-in db parent-path dissoc k))))
 
 (rf/reg-event-db :delete-in (fn-traced [& args] (apply do-delete-in args)))
 
@@ -292,8 +303,8 @@
                  ;; Auto-generated via ::m0 multimethod (Demo product)
                  [document-view m2 m1 req]))])]))
      ;; Developer pane
-     [:details {:open true}
-      [:summary {:style {:padding "8px" :cursor "pointer" :background "#e0e0e0" :font-weight "bold"}} "Developer View"]
+     [:details {:class "dev-details"}
+      [:summary {:class "dev-summary"} "Developer View"]
       [:main {:style {:overflow-x "auto"}}
        [:table {:class "dev-table"}
         [:thead
@@ -312,7 +323,10 @@
           [:td {:class "dev-json"}
            [:textarea {:rows 50 :cols 50 :read-only true :value (pretty @m3s)}]]
           [:td {:class "dev-editor"}
-           ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over :expanded @expanded :original-key @original-key} [:m3] nil @m3s)
+           ;; M3→M2: inject mdast-ref checker closing over M2 for referential integrity
+           ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over
+                        :check-format (make-check-formats @m2s)
+                        :expanded @expanded :original-key @original-key} [:m3] nil @m3s)
             {:draft "latest" :root @m2s :$ref-merger :merge-over} [:m2] nil @m2s)]
           [:td {:class "dev-json"}
            [:textarea {:rows 50 :cols 50 :read-only false :value (clj->json @m2s)
@@ -323,6 +337,7 @@
           [:td {:class "dev-json"}
            [:textarea {:rows 50 :cols 50 :read-only false :value (clj->json @m1s)
                        :on-change (fn [event] (rf/dispatch [:assoc-in [:m1] (json->clj (.-value (.-target event)))]))}]]]]]]]]))
+
 
 ;; -------------------------
 ;; Initialize app

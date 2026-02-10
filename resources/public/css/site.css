@@ -44,35 +44,270 @@ a:hover {
     border: 2px solid red;
 }
 
-/* Developer view */
+/* ============================================================
+   Developer view — professional schema editor
+   ============================================================ */
+
+.dev-details {
+    border-top: 1px solid #ddd;
+}
+
+.dev-summary {
+    padding: 10px 16px;
+    cursor: pointer;
+    background: linear-gradient(to bottom, #f5f5f5, #e8e8e8);
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #555;
+    user-select: none;
+    border-bottom: 1px solid #ddd;
+}
+
+.dev-summary:hover {
+    background: linear-gradient(to bottom, #eee, #ddd);
+    color: #333;
+}
+
+.dev-json-toggle {
+    float: right;
+    padding: 2px 10px;
+    border: 1px solid #bbb;
+    border-radius: 3px;
+    background: #fff;
+    color: #555;
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+
+.dev-json-toggle:hover {
+    background: #f0f0f0;
+    border-color: #999;
+}
+
 .dev-table {
     border-collapse: collapse;
     margin: 0 auto;
+    font-size: 13px;
+    line-height: 1.4;
 }
 
 .dev-table th {
-    padding: 4px 8px;
-    background: #e8e8e8;
-    border: 1px solid #ccc;
-    font-size: 0.9em;
+    padding: 6px 12px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
     white-space: nowrap;
 }
 
 .dev-table td {
     vertical-align: top;
-    border: 1px solid #eee;
+    border: 1px solid #e8e8e8;
 }
 
 .dev-editor {
     min-width: 280px;
     overflow: auto;
-    padding: 4px;
+    padding: 6px;
+    background: #fafafa;
 }
 
 .dev-json textarea {
-    font-family: monospace;
-    font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 11px;
     resize: vertical;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 6px;
+    background: #fff;
+}
+
+/* --- Schema node type indicators (left-border color coding) --- */
+.dev-node {
+    padding: 4px 6px;
+    margin: 1px 0;
+    border-radius: 3px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+}
+
+.dev-node-object {
+    border-left: 3px solid #5b9bd5;
+}
+
+.dev-node-string {
+    border-left: 3px solid #e6a817;
+}
+
+.dev-node-number, .dev-node-integer {
+    border-left: 3px solid #70ad47;
+}
+
+.dev-node-boolean {
+    border-left: 3px solid #ed7d31;
+}
+
+.dev-node-array {
+    border-left: 3px solid #c45a5a;
+}
+
+.dev-node-oneof {
+    border-left: 3px solid #9b59b6;
+}
+
+.dev-node-null {
+    border-left: 3px solid #aaa;
+}
+
+/* --- Validation state on dev nodes --- */
+.dev-node.invalid {
+    border-color: #d32f2f;
+    background: #fff5f5;
+}
+
+.dev-node.valid {
+    border-color: #e0e0e0;
+}
+
+/* --- Schema node tables (replaces border: 1 on nested tables) --- */
+.dev-node table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.dev-node table td {
+    padding: 2px 4px;
+    border: none;
+    vertical-align: middle;
+}
+
+.dev-node caption {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: #555;
+    padding: 2px 0;
+    letter-spacing: 0.3px;
+}
+
+.dev-node caption h4 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+}
+
+/* --- Developer view inputs --- */
+.dev-node input[type="text"],
+.dev-node input[type="number"],
+.dev-node input[type="date"],
+.dev-node input[type="time"],
+.dev-node input[type="datetime-local"],
+.dev-node input[type="month"],
+.dev-node input[type="week"] {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    padding: 2px 4px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.dev-node input:focus {
+    border-color: #5b9bd5;
+    box-shadow: 0 0 0 1px rgba(91, 155, 213, 0.2);
+}
+
+.dev-node input[readOnly],
+.dev-node input[read-only] {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.dev-node select {
+    font-size: 12px;
+    padding: 2px 4px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    background: #fff;
+}
+
+/* --- Expand/collapse and action buttons --- */
+.dev-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #f8f8f8;
+    color: #666;
+    font-size: 11px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.1s;
+}
+
+.dev-btn:hover {
+    background: #e8e8e8;
+    border-color: #aaa;
+    color: #333;
+}
+
+.dev-btn-add {
+    color: #2e7d32;
+    border-color: #a5d6a7;
+    background: #e8f5e9;
+}
+
+.dev-btn-add:hover {
+    background: #c8e6c9;
+    border-color: #66bb6a;
+}
+
+.dev-btn-remove {
+    color: #c62828;
+    border-color: #ef9a9a;
+    background: #ffebee;
+}
+
+.dev-btn-remove:hover {
+    background: #ffcdd2;
+    border-color: #ef5350;
+}
+
+/* --- Property name labels --- */
+.dev-prop-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #555;
+    padding: 2px 6px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    border: 1px solid #ddd;
+    white-space: nowrap;
+}
+
+/* --- Section headers in node types --- */
+.dev-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    padding: 4px 0 2px;
 }
 
 /* M0 WYSIWYG edit mode */

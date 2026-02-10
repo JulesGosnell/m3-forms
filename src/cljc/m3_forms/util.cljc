@@ -66,12 +66,75 @@
 (defn check-format-bank-sort-code      [_property _m2-ctx m2-path m2-doc m2-val] (fn [m1-ctx m1-path m1-doc]))
 (defn check-format-telephone-number    [_property _m2-ctx m2-path m2-doc m2-val] (fn [m1-ctx m1-path m1-doc]))
 
+;;------------------------------------------------------------------------------
+;; mdast-ref format checker — verifies fieldReference/each/conditional paths
+;; resolve against M2 schema properties.
+;;
+;; TEMPORARY: The M2 instance is closed over at checker creation time because
+;; the m3 validator doesn't currently expose the instance root in c1.
+;; Once m3 supports an :instance-root (or similar) in c1, this closure approach
+;; should be replaced: the checker would read the M2 document from c1 at L1
+;; runtime, making it work generically for any JSON Schema cross-reference
+;; validation without needing to know the instance at compile time.
+;;
+;; The broader pattern — cross-schema referential integrity — is something m3
+;; should support as a first-class capability. Every schema with internal $refs,
+;; foreign keys, or path references has the same problem: dangling refs that
+;; JSON Schema's structural validation can't catch.
+
+(defn resolve-schema-path
+  "Walk an M2 schema following a dotted path through properties/items.
+   Returns the sub-schema at the path, or nil if unresolvable.
+   E.g. 'personalInformation.fullName' resolves through
+   properties.personalInformation.properties.fullName."
+  [m2 path-str]
+  (when (and (map? m2) (string? path-str) (seq path-str))
+    (let [segments (clojure.string/split path-str #"\.")]
+      (loop [schema m2
+             [seg & more] segments]
+        (if-not seg
+          schema ;; resolved successfully
+          (let [;; Try object properties
+                prop-schema (get-in schema ["properties" seg])]
+            (if prop-schema
+              (recur prop-schema more)
+              ;; Try array items.properties (for paths inside 'each')
+              (let [items (get schema "items")
+                    item-prop (when (map? items) (get-in items ["properties" seg]))]
+                (if item-prop
+                  (recur item-prop more)
+                  nil)))))))))
+
+(defn make-mdast-ref-checker
+  "Create an mdast-ref format checker that closes over a specific M2 schema.
+   Returns a format checker following the m3 two-level currying convention:
+   L2: (fn [property c2 p2 m2 v2] ...) → [c2 m2 f1]
+   L1: f1 = (fn [c1 p1 m1] ...)"
+  [m2-instance]
+  (fn [_property _m2-ctx _m2-path _m2-doc _m2-val]
+    (fn [_m1-ctx m1-path m1-doc]
+      (when (and (string? m1-doc) (seq m1-doc))
+        (when-not (resolve-schema-path m2-instance m1-doc)
+          [{:error "mdast-ref"
+            :message (str "Path '" m1-doc "' does not resolve in M2 schema")
+            :path m1-path}])))))
+
+(defn make-check-formats
+  "Build the check-format map, optionally including an mdast-ref checker
+   that closes over the given M2 instance for referential integrity checking."
+  ([] (make-check-formats nil))
+  ([m2-instance]
+   (cond-> {"range"               check-format-range
+            "money"               check-format-money
+            "bank-account-number" check-format-bank-account-number
+            "bank-sort-code"      check-format-bank-sort-code
+            "telephone-number"    check-format-telephone-number}
+     m2-instance (assoc "mdast-ref" (make-mdast-ref-checker m2-instance)))))
+
 (def check-formats
-  {"range"               check-format-range
-   "money"               check-format-money
-   "bank-account-number" check-format-bank-account-number
-   "bank-sort-code"      check-format-bank-sort-code
-   "telephone-number"    check-format-telephone-number})
+  "Default check-formats without mdast-ref (no M2 instance to close over).
+   Use make-check-formats with an M2 instance for referential integrity."
+  (make-check-formats))
 
 ;;------------------------------------------------------------------------------
 

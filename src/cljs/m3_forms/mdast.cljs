@@ -169,7 +169,7 @@
     [:li (render-children (get node "children") ctx)]
 
     "table"
-    [:table.m0-table (render-children (get node "children") ctx)]
+    [:table.m0-table [:tbody (render-children (get node "children") ctx)]]
 
     "tableRow"
     [:tr (render-children (get node "children") ctx)]
@@ -205,7 +205,7 @@
           full-path (into (vec (:base-path ctx)) path-parts)
           m1 @(rf/subscribe [:m1])
           items (get-in m1 (coerce-path full-path))]
-      [:span
+      [:<>
        (when (sequential? items)
          (doall
           (map-indexed
@@ -213,7 +213,7 @@
              (let [item-base (conj (vec full-path) (str i))
                    child-ctx (assoc ctx :base-path item-base)]
                ^{:key i}
-               [:span (render-children (get node "children") child-ctx)]))
+               [:<> (render-children (get node "children") child-ctx)]))
            items)))])
 
     "conditional"
@@ -225,9 +225,8 @@
           value (when opt (first opt))
           cases (get node "cases")
           matching-children (get cases (str value))]
-      (if matching-children
-        [:span (render-children matching-children ctx)]
-        nil))
+      (when matching-children
+        [:<> (render-children matching-children ctx)]))
 
     ;; Default — unknown node type, skip
     nil))
