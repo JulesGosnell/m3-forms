@@ -31,24 +31,33 @@
   (join "." path))
 
 (defn valid? [m2-ctx m2]
-  (let [v? (check-schema m2-ctx [] m2)]
+  (let [v? (check-schema m2-ctx [] m2)
+        ;; Compile format checker at L2 if a format and checker are available
+        fmt (get m2 "format")
+        check-fmt (when fmt (get (:check-format m2-ctx) fmt))
+        fmt-l1 (when check-fmt (check-fmt "format" m2-ctx [] m2 fmt))]
     (fn [m1-ctx m1]
-      (let [r (when (present? m1) (v? m1-ctx [] m1))]
-        (if (seq r)
-          (do
-            (prn r)
-            "invalid")
+      (let [struct-errors (when (present? m1) (v? m1-ctx [] m1))
+            format-errors (when (and fmt-l1 (present? m1)) (fmt-l1 m1-ctx [] m1))
+            all-errors (concat struct-errors format-errors)]
+        (if (seq all-errors)
+          "invalid"
           "valid")))))
 
 (defn valid-with-errors
   "Like valid? but returns a map with :class and :errors for richer validation UI.
    {:class \"valid\"/\"invalid\" :errors [\"error msg\" ...]}"
   [m2-ctx m2]
-  (let [v? (check-schema m2-ctx [] m2)]
+  (let [v? (check-schema m2-ctx [] m2)
+        fmt (get m2 "format")
+        check-fmt (when fmt (get (:check-format m2-ctx) fmt))
+        fmt-l1 (when check-fmt (check-fmt "format" m2-ctx [] m2 fmt))]
     (fn [m1-ctx m1]
-      (let [r (when (present? m1) (v? m1-ctx [] m1))]
-        (if (seq r)
-          {:class "invalid" :errors (mapv str r)}
+      (let [struct-errors (when (present? m1) (v? m1-ctx [] m1))
+            format-errors (when (and fmt-l1 (present? m1)) (fmt-l1 m1-ctx [] m1))
+            all-errors (concat struct-errors format-errors)]
+        (if (seq all-errors)
+          {:class "invalid" :errors (mapv str all-errors)}
           {:class "valid" :errors []})))))
 
 (defn mapl [& args] (doall (apply map args)))
