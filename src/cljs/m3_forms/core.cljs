@@ -36,6 +36,7 @@
    [m3-forms.divorce  :refer [divorce-workflow-m1 divorce-m2 divorce-m1]]
    [m3-forms.final-terms  :refer [final-terms-workflow-m1 final-terms-m2 final-terms-m1]]
    [m3-forms.property-purchase :refer [property-purchase-workflow-m1 property-purchase-m2 property-purchase-m1]]
+   [m3-forms.tax-return :refer [tax-return-workflow-m1 tax-return-m2 tax-return-m1]]
    [m3-forms.m0       :refer [document-view]]
    ))
 
@@ -51,6 +52,8 @@
               :workflow divorce-workflow-m1}
    "Property Purchase" {:m2 property-purchase-m2 :m1 property-purchase-m1
                         :workflow property-purchase-workflow-m1}
+   "Tax Return" {:m2 tax-return-m2 :m1 tax-return-m1
+                  :workflow tax-return-workflow-m1}
    "Demo" {:m2 demo-m2 :m1 demo-m1
             :workflow demo-workflow-m1}))
 
