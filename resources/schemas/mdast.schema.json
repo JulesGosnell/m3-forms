@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/syntax-tree/mdast/main/mdast.schema.json",
+  "title": "mdast (Markdown Abstract Syntax Tree)",
+  "description": "JSON Schema for mdast — the Markdown Abstract Syntax Tree format. Covers core mdast nodes plus GFM (GitHub Flavored Markdown) table extensions. See https://github.com/syntax-tree/mdast",
+
+  "$ref": "#/$defs/root",
+
+  "$defs": {
+
+    "position": {
+      "title": "unist Position",
+      "description": "Location of a node in a source document (from unist).",
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/$defs/point" },
+        "end":   { "$ref": "#/$defs/point" }
+      },
+      "required": ["start", "end"]
+    },
+
+    "point": {
+      "title": "unist Point",
+      "description": "A specific place in a source file.",
+      "type": "object",
+      "properties": {
+        "line":   { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "offset": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["line", "column"]
+    },
+
+    "node": {
+      "title": "mdast Node",
+      "description": "Any mdast node — discriminated union on the 'type' property.",
+      "oneOf": [
+        { "$ref": "#/$defs/root" },
+        { "$ref": "#/$defs/heading" },
+        { "$ref": "#/$defs/paragraph" },
+        { "$ref": "#/$defs/blockquote" },
+        { "$ref": "#/$defs/list" },
+        { "$ref": "#/$defs/listItem" },
+        { "$ref": "#/$defs/code" },
+        { "$ref": "#/$defs/html" },
+        { "$ref": "#/$defs/thematicBreak" },
+        { "$ref": "#/$defs/definition" },
+        { "$ref": "#/$defs/text" },
+        { "$ref": "#/$defs/emphasis" },
+        { "$ref": "#/$defs/strong" },
+        { "$ref": "#/$defs/link" },
+        { "$ref": "#/$defs/linkReference" },
+        { "$ref": "#/$defs/image" },
+        { "$ref": "#/$defs/imageReference" },
+        { "$ref": "#/$defs/inlineCode" },
+        { "$ref": "#/$defs/break" },
+        { "$ref": "#/$defs/table" },
+        { "$ref": "#/$defs/tableRow" },
+        { "$ref": "#/$defs/tableCell" }
+      ]
+    },
+
+    "root": {
+      "title": "Root",
+      "description": "The root node of an mdast tree.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "root" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "heading": {
+      "title": "Heading",
+      "description": "A heading (h1–h6).",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "heading" },
+        "depth":    { "type": "integer", "minimum": 1, "maximum": 6 },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "depth", "children"]
+    },
+
+    "paragraph": {
+      "title": "Paragraph",
+      "description": "A unit of discourse dealing with a particular point or idea.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "paragraph" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "blockquote": {
+      "title": "Blockquote",
+      "description": "A section quoted from another source.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "blockquote" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "list": {
+      "title": "List",
+      "description": "An ordered or unordered list.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "list" },
+        "ordered":  { "type": "boolean" },
+        "start":    { "type": "integer", "minimum": 0 },
+        "spread":   { "type": "boolean" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/listItem" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "listItem": {
+      "title": "List Item",
+      "description": "An item in a list.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "listItem" },
+        "checked":  { "type": ["boolean", "null"] },
+        "spread":   { "type": "boolean" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "code": {
+      "title": "Code",
+      "description": "A block of preformatted text.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "code" },
+        "value":    { "type": "string" },
+        "lang":     { "type": ["string", "null"] },
+        "meta":     { "type": ["string", "null"] },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "value"]
+    },
+
+    "html": {
+      "title": "HTML",
+      "description": "A fragment of raw HTML.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "html" },
+        "value":    { "type": "string" },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "value"]
+    },
+
+    "thematicBreak": {
+      "title": "Thematic Break",
+      "description": "A thematic break, such as a scene change or topic transition (typically rendered as a horizontal rule).",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "thematicBreak" },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type"]
+    },
+
+    "definition": {
+      "title": "Definition",
+      "description": "A link/image reference definition.",
+      "type": "object",
+      "properties": {
+        "type":       { "const": "definition" },
+        "identifier": { "type": "string" },
+        "label":      { "type": "string" },
+        "url":        { "type": "string" },
+        "title":      { "type": ["string", "null"] },
+        "data":       { "type": "object" },
+        "position":   { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "identifier", "url"]
+    },
+
+    "text": {
+      "title": "Text",
+      "description": "Plain text.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "text" },
+        "value":    { "type": "string" },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "value"]
+    },
+
+    "emphasis": {
+      "title": "Emphasis",
+      "description": "Stress emphasis of its contents (typically rendered as italics).",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "emphasis" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "strong": {
+      "title": "Strong",
+      "description": "Strong importance, seriousness, or urgency (typically rendered as bold).",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "strong" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "link": {
+      "title": "Link",
+      "description": "A hyperlink.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "link" },
+        "url":      { "type": "string" },
+        "title":    { "type": ["string", "null"] },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "url", "children"]
+    },
+
+    "linkReference": {
+      "title": "Link Reference",
+      "description": "A hyperlink through association.",
+      "type": "object",
+      "properties": {
+        "type":          { "const": "linkReference" },
+        "identifier":    { "type": "string" },
+        "label":         { "type": "string" },
+        "referenceType": { "type": "string", "enum": ["shortcut", "collapsed", "full"] },
+        "children":      { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":          { "type": "object" },
+        "position":      { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "identifier", "referenceType", "children"]
+    },
+
+    "image": {
+      "title": "Image",
+      "description": "An image.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "image" },
+        "url":      { "type": "string" },
+        "title":    { "type": ["string", "null"] },
+        "alt":      { "type": ["string", "null"] },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "url"]
+    },
+
+    "imageReference": {
+      "title": "Image Reference",
+      "description": "An image through association.",
+      "type": "object",
+      "properties": {
+        "type":          { "const": "imageReference" },
+        "identifier":    { "type": "string" },
+        "label":         { "type": "string" },
+        "referenceType": { "type": "string", "enum": ["shortcut", "collapsed", "full"] },
+        "alt":           { "type": ["string", "null"] },
+        "data":          { "type": "object" },
+        "position":      { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "identifier", "referenceType"]
+    },
+
+    "inlineCode": {
+      "title": "Inline Code",
+      "description": "A fragment of computer code.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "inlineCode" },
+        "value":    { "type": "string" },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "value"]
+    },
+
+    "break": {
+      "title": "Break",
+      "description": "A line break (as in poems or addresses).",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "break" },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type"]
+    },
+
+    "table": {
+      "title": "Table (GFM)",
+      "description": "Two-dimensional data. The first child row is the header. From the GFM extension.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "table" },
+        "align":    { "type": "array", "items": { "type": ["string", "null"], "enum": ["left", "right", "center", null] } },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/tableRow" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "tableRow": {
+      "title": "Table Row (GFM)",
+      "description": "A row of cells in a table.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "tableRow" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/tableCell" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    },
+
+    "tableCell": {
+      "title": "Table Cell (GFM)",
+      "description": "A cell in a table row.",
+      "type": "object",
+      "properties": {
+        "type":     { "const": "tableCell" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "data":     { "type": "object" },
+        "position": { "$ref": "#/$defs/position" }
+      },
+      "required": ["type", "children"]
+    }
+  }
+}
