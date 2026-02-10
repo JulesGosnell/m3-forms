@@ -191,6 +191,7 @@
 (defmethod render-2 [::html5 "string" "year-month"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "month"))
 (defmethod render-2 [::html5 "string" "uri-reference"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
 (defmethod render-2 [::html5 "string" "regex"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
+(defmethod render-2 [::html5 "string" "email"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "email"))
 (defmethod render-2 [::html5 "string" "bank-sort-code"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
 (defmethod render-2 [::html5 "string" "bank-account-number"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
 (defmethod render-2 [::html5 "string" "telephone-number"] [c2 p2 k2 m2] (render-string c2 p2 k2 m2 "text"))
