@@ -23,7 +23,7 @@
    [day8.re-frame.tracing :refer-macros [fn-traced]]
    [m3-forms.log :as log]
 
-   [m3-forms.util     :refer [index-by-$id check-formats make-check-formats]]
+   [m3-forms.util     :refer [index-by-$id check-formats]]
    [m3-forms.schema   :refer [make-m3]]
    [m3-forms.json     :refer [json-insert-in json-remove-in option-get-in insertv deletev]]
    [m3-forms.migrate  :refer [migrate]]
@@ -329,9 +329,8 @@
           [:td {:class "dev-json"}
            [:textarea {:rows 50 :cols 50 :read-only true :value (pretty @m3s)}]]
           [:td {:class "dev-editor"}
-           ;; M3→M2: inject mdast-ref checker closing over M2 for referential integrity
            ((render-1 {:draft "latest" :root @m3s :$ref-merger :merge-over
-                        :check-format (make-check-formats @m2s)
+                        :check-format check-formats
                         :expanded @expanded :original-key @original-key} [:m3] nil @m3s)
             {:draft "latest" :root @m2s :$ref-merger :merge-over} [:m2] nil @m2s)]
           [:td {:class "dev-json"}
